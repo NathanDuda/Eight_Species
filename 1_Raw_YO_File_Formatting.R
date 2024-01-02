@@ -108,14 +108,18 @@ for (row_num in 1:nrow(longest_transcript)) {
 }
 
 
-
-
+# remove the ORFs with 'N' in the sequences and those without ORFs 
 longest_transcript <- longest_transcript %>%
   filter(!grepl('N',longest_ORF)) %>% filter(!is.na(longest_ORF)) %>%
   rowwise() %>%
   mutate(prot = as.character(Biostrings::translate(DNAString(longest_ORF))))
 
+# keep only sequences with protein length >=10
+longest_transcript <- longest_transcript %>%
+  mutate(prot_length = nchar(prot)) %>%
+  filter(prot_length >= 10)
 
+# add a species column 
 longest_transcript <- longest_transcript %>%
   mutate(species = case_when(grepl('AN',YOgn) ~ 'dana',
                              grepl('ME',YOgn) ~ 'dmel',
@@ -126,35 +130,30 @@ longest_transcript <- longest_transcript %>%
                              grepl('WI',YOgn) ~ 'dwil',
                              grepl('YA',YOgn) ~ 'dyak'))
 
-
+# write table to file 
 write.table(longest_transcript,file='longest_transcript.tsv')
 
 
 
 # write fasta files 
+unique_species <- unique(longest_transcript$species)
 
-
-
-write_fasta <- function(longest_transcript) {
-  species_name <- unique(longest_transcript$species)[1]
-  sequences <- paste0(">", longest_transcript$YOgn, "\n", longest_transcript$prot)
+for (species_name in unique_species) {
+  species_data <- longest_transcript[longest_transcript$species == species_name, ]
+  
+  # for proteins:
+  sequences <- paste0(">", species_data$YOgn, "\n", species_data$prot)
   fasta_content <- paste(sequences, collapse = "\n")
-  writeLines(fasta_content, con = paste0('./Protein_Fastas/', species_name, "_prot.fasta"))
+  
+  file_path <- file.path('./Protein_Fastas/', paste0(species_name, "_prot.fasta"))
+  writeLines(fasta_content, con = file_path)
+  
+  # for nucleotides:
+  sequences <- paste0(">", species_data$YOgn, "\n", species_data$longest_ORF)
+  fasta_content <- paste(sequences, collapse = "\n")
+  
+  file_path <- file.path('./Nucleotide_Fastas/', paste0(species_name, "_nuc.fasta"))
+  writeLines(fasta_content, con = file_path)
 }
-
-# Apply the function to each group
-longest_transcript  %>% group_by(species) %>% group_map(~write_fasta(.))
-
-
-
-
-
-
-
-
-
-
-
-
 
 
