@@ -89,6 +89,10 @@ expressed_genes <- all_expression %>%
   select(YOgnID,all_of(tissue_names)) %>%
   filter(rowSums(select(., 2:15)) > 0)
 
+# write expressed genes to file
+write.table(expressed_genes,'Expression_Data.tsv')
+
+
 # keep only expressed duplicates 
 colnames(expressed_genes)[1] <- 'dup_1'
 dups_expressed <- merge(dups,expressed_genes,by='dup_1')

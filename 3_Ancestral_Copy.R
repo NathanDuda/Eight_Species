@@ -1,4 +1,5 @@
 
+# this script also gets all ortholog pairs of each duplicate pair 
 
 
 source('./startup.R')
@@ -63,5 +64,37 @@ dups <- merge(dups,ancestral_copy,by='Orthogroup')
 
 # write the duplicate pairs with their ancestral copy to file
 write.table(dups,'Dup_Pairs_Ancestral.tsv')
+
+
+
+### all combinations of ortholog pairs
+
+all_ortholog_pairs <- orthologs[c(1:9)] %>%
+  mutate_all(~ifelse(grepl(",", .), NA, .)) %>%
+  pivot_longer(cols = c(2:9))
+
+all_ortholog_pairs <- 
+  merge(all_ortholog_pairs,all_ortholog_pairs,by='Orthogroup') %>%
+  na.omit() %>%
+  filter(name.x!=name.y) %>% 
+
+  # keep only one of the reciprocal combination pairs  
+  mutate(x_y = paste0(value.x,'_',value.y)) %>%
+  mutate(y_x = paste0(value.y,'_',value.x)) %>%
+  filter(!(x_y > y_x)) %>%
+  select(-x_y,-y_x)
+
+
+colnames(all_ortholog_pairs) <- c('Orthogroup','species.x','YOgn.x','species.y','YOgn.y')
+
+
+# keep orthologs with expression data and are expressed in at least one tissue
+expression <- read.csv("./Expression_Data.tsv", sep="")
+
+expressed_ortholog_pairs <- all_ortholog_pairs %>%
+  filter((YOgn.x %in% expression$YOgnID) & (YOgn.y %in% expression$YOgnID))
+
+# write ortholog pairs to file
+write.table(expressed_ortholog_pairs,file = './Ortholog_Pairs.tsv')
 
 
