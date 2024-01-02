@@ -4,7 +4,7 @@
 source('./startup.R')
 
 # import all annotations from YO 
-all_annotations <- read.delim("C:/Users/17735/Downloads/Eight_Species/Raw_YO_Data/YO_Annotations/all.YO.gtf", header=FALSE)
+all_annotations <- read.delim("C:/Users/17735/Downloads/Eight_Species/Raw_Data/YO_Annotations/all.YO.gtf", header=FALSE)
 colnames(all_annotations) <- c('chrom','StringTie_or_FlyBase','type','start','end','x','strand','y','id')
 
 # format the transcripts
@@ -39,7 +39,121 @@ longest_transcript[grepl('MSTRG', longest_transcript$old), 'old'] <- NA
 longest_transcript <- longest_transcript[c('YOgn','YOtr','old','chrom','strand','start','end')]
 
 
-# get the sequences for 
+# get the sequences for the transcripts
+
+fasta_sequences <- readDNAStringSet('./Raw_Data/FlyBase_2017_03_Genomes/all_chromosome.fasta')
+
+species <- sub(".*species=([^;]+).*", "\\1", names(fasta_sequences))
+scaffolds <- gsub(" .*", "", names(fasta_sequences))
+
+names(fasta_sequences) <- paste0(species,'_',scaffolds)
+
+
+longest_transcript$chrom <- longest_transcript$chrom
+
+longest_transcript <- longest_transcript %>%
+  mutate(chrom = case_when(grepl('AN',YOgn) ~ paste0('Dana_',chrom),
+                           grepl('ME',YOgn) ~ paste0('Dmel_',chrom),
+                           grepl('MO',YOgn) ~ paste0('Dmoj_',chrom),
+                           grepl('PE',YOgn) ~ paste0('Dper_',chrom),
+                           grepl('PS',YOgn) ~ paste0('Dpse_',chrom),
+                           grepl('VI',YOgn) ~ paste0('Dvir_',chrom),
+                           grepl('WI',YOgn) ~ paste0('Dwil_',chrom),
+                           grepl('YA',YOgn) ~ paste0('Dyak_',chrom)))
+
+
+# function to extract sequences
+extract_sequence <- function(chrom, start, end, strand, fasta_sequences) {
+  matches <- fasta_sequences[names(fasta_sequences) == chrom]
+  if (length(matches) > 0) {
+    seq <- subseq(matches, start, end)
+    if (strand == "-") {seq <- reverseComplement(seq)}
+    as.character(seq)
+  } 
+  else {NA}
+}
+
+
+# apply the function to create column 'extracted_sequence'
+longest_transcript$extracted_sequence <- mapply(
+  extract_sequence,
+  longest_transcript$chrom,
+  longest_transcript$start,
+  longest_transcript$end,
+  longest_transcript$strand,
+  MoreArgs = list(fasta_sequences)
+)
+
+
+# get the longest ORFs 
+
+longest_transcript$longest_ORF <- NA
+library(ORFik)
+for (row_num in 1:nrow(longest_transcript)) {
+  row <- longest_transcript[row_num,]
+  
+  # find the ORFs in the given transcript 
+  orfs <- as.data.frame(findORFs(row$extracted_sequence, start = "ATG"))
+  
+  if (nrow(orfs) > 0) {
+    # keep only longest ORF and if multiple have same length, keep only first one
+    longest_orf <- orfs[which.max(orfs$width), c("start", "end"), drop = FALSE]
+  
+    # place the ORF sequence into the longest_transcript dataframe 
+    longest_transcript[row_num, 'longest_ORF'] <- substr(longest_transcript[row_num,'extracted_sequence'], 
+                                                         longest_orf$start, longest_orf$end)
+  }
+  
+  print(row_num)
+}
+
+
+
+
+longest_transcript <- longest_transcript %>%
+  filter(!grepl('N',longest_ORF)) %>% filter(!is.na(longest_ORF)) %>%
+  rowwise() %>%
+  mutate(prot = as.character(Biostrings::translate(DNAString(longest_ORF))))
+
+
+longest_transcript <- longest_transcript %>%
+  mutate(species = case_when(grepl('AN',YOgn) ~ 'dana',
+                             grepl('ME',YOgn) ~ 'dmel',
+                             grepl('MO',YOgn) ~ 'dmoj',
+                             grepl('PE',YOgn) ~ 'dper',
+                             grepl('PS',YOgn) ~ 'dpse',
+                             grepl('VI',YOgn) ~ 'dvir',
+                             grepl('WI',YOgn) ~ 'dwil',
+                             grepl('YA',YOgn) ~ 'dyak'))
+
+
+write.table(longest_transcript,file='longest_transcript.tsv')
+
+
+
+# write fasta files 
+
+
+
+write_fasta <- function(longest_transcript) {
+  species_name <- unique(longest_transcript$species)[1]
+  sequences <- paste0(">", longest_transcript$YOgn, "\n", longest_transcript$prot)
+  fasta_content <- paste(sequences, collapse = "\n")
+  writeLines(fasta_content, con = paste0('./Protein_Fastas/', species_name, "_prot.fasta"))
+}
+
+# Apply the function to each group
+longest_transcript  %>% group_by(species) %>% group_map(~write_fasta(.))
+
+
+
+
+
+
+
+
+
+
 
 
 
