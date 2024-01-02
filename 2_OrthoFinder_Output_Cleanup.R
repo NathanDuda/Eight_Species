@@ -58,7 +58,7 @@ dups <- two_to_ones %>%
   
   # extract the duplicate pair genes
   mutate(duplicate_pair = toString(c_across(2:9)[grep(",", c_across(2:9))])) %>%
-  select(duplicate_pair) %>%
+  select(Orthogroup, duplicate_pair) %>%
   separate(duplicate_pair, into = c("dup_1", "dup_2"), sep = ", ") %>%
   
   # ordering so that dup_1 is always > dup_2 for easy error catching  
@@ -97,7 +97,7 @@ colnames(expressed_genes)[1] <- 'dup_2'
 dups_expressed <- merge(dups_expressed,expressed_genes,by='dup_2')
 
 # write duplicate pairs to file
-dups <- dups_expressed[c('dup_1','dup_2')]
+dups <- dups_expressed[c('Orthogroup','dup_1','dup_2')]
 write.table(dups, file = 'Duplicate_Pairs.tsv')
 
 
