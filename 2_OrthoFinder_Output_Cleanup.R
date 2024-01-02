@@ -1,0 +1,104 @@
+
+# this script also cleans up the raw expression data 
+
+
+source('./startup.R')
+
+# OrthoFinder was run on with default parameters the protein fastas:
+# OrthoFinder/orthofinder -f ./Eight_Species/Protein_Fastas/ -o ./Eight_Species/OrthoFinder_Output/
+
+
+longest_transcript <- read.csv("./longest_transcript.tsv", sep="")
+
+
+
+### Orthologs:
+orthogroups <- read.delim2("./OrthoFinder_Output/Results_Jan01/Orthogroups/Orthogroups.tsv")
+
+# get the one to ones 
+one_to_ones <- orthogroups %>%
+  filter_all(all_vars(!grepl(",", .))) %>% 
+  mutate_all(~ifelse(. == "", NA, .)) %>% # change empty cells to NA 
+  na.omit()
+
+# write the one to ones to file
+write.table(one_to_ones,file='One_to_Ones.tsv')
+
+
+# import the number of genes each species has in each orthogroup 
+orthogroup_gene_count <- read.delim("./OrthoFinder_Output/Results_Jan01/Orthogroups/Orthogroups.GeneCount.tsv")
+
+# get the two to one to ones to zeros 
+two_to_ones <- orthogroup_gene_count %>%
+  filter(if_all(2:9, ~. <= 2)) %>%              # keep only pairs 
+  filter(rowSums(select(., 2:9) == 2) == 1) %>% # make sure there is only one species with 2 copies 
+  filter(Total > 2)                             # remove duplicates without any orthologs 
+  
+  
+# add a column with the name of the species with the duplication
+two_to_ones$duplicate_pair_species <- 
+  apply(two_to_ones[, 2:9], 1, function(x) {
+  col_index <- which(x == 2)
+  return(colnames(two_to_ones[, 2:9])[col_index])})
+
+two_to_ones <- two_to_ones[c('Orthogroup','duplicate_pair_species')]
+two_to_ones$duplicate_pair_species <- gsub('_prot','',two_to_ones$duplicate_pair_species)
+
+# merge back with the gene names 
+two_to_ones <- merge(orthogroups,two_to_ones,by='Orthogroup')
+
+write.table(two_to_ones, file='Dup_Pair_Orthologs.tsv')
+
+
+
+### Paralogs: 
+
+dups <- two_to_ones %>%
+  rowwise() %>%
+  
+  # extract the duplicate pair genes
+  mutate(duplicate_pair = toString(c_across(2:9)[grep(",", c_across(2:9))])) %>%
+  select(duplicate_pair) %>%
+  separate(duplicate_pair, into = c("dup_1", "dup_2"), sep = ", ") %>%
+  
+  # ordering so that dup_1 is always > dup_2 for easy error catching  
+  mutate(temp_column = dup_1) %>%
+  mutate(dup_1 = case_when(dup_1 < dup_2 ~ dup_1, dup_1 > dup_2 ~ dup_2)) %>%
+  mutate(dup_2 = case_when(dup_1 < dup_2 ~ dup_2, dup_1 > dup_2 ~ temp_column)) %>%
+  select(-temp_column)
+
+# keep only duplicate pairs with expression 
+all_expression <- read.delim("./Raw_Data/YO_Expression/all_expression.txt")
+all_expression <- all_expression %>% select(-jaccard, -FBgnID)
+all_expression <- all_expression %>% 
+  rename_all(~gsub("^dana_", "", .)) %>%
+  filter(!is.na(as.numeric(f_ac_R1))) %>%
+  mutate(across(2:ncol(all_expression), as.numeric)) 
+
+# get average expression value for replicates
+tissue_names <- c('f_ac','f_dg','f_go','f_hd','f_re','f_tx','f_wb',
+                  'm_ac','m_dg','m_go','m_hd','m_re','m_tx','m_wb')
+
+for (tissue in tissue_names) {
+  all_expression <- all_expression %>%
+    mutate("{tissue}" := rowMeans(select(., starts_with(tissue)), na.rm = TRUE))
+}
+
+# filter out genes with no expression in all tissues 
+expressed_genes <- all_expression %>%
+  select(YOgnID,all_of(tissue_names)) %>%
+  filter(rowSums(select(., 2:15)) > 0)
+
+# keep only expressed duplicates 
+colnames(expressed_genes)[1] <- 'dup_1'
+dups_expressed <- merge(dups,expressed_genes,by='dup_1')
+
+colnames(expressed_genes)[1] <- 'dup_2'
+dups_expressed <- merge(dups_expressed,expressed_genes,by='dup_2')
+
+# write duplicate pairs to file
+dups <- dups_expressed[c('dup_1','dup_2')]
+write.table(dups, file = 'Duplicate_Pairs.tsv')
+
+
+
