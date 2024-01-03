@@ -10,6 +10,9 @@ dups <- read.csv("./Duplicate_Pairs.tsv", sep="")
 # read in orthologs of duplicate pairs 
 orthologs <- read.csv2("./Dup_Pair_Orthologs.tsv", sep="")
 
+# read in expression data 
+expression <- read.csv("./Expression_Data.tsv", sep="")
+
 # clean the column names of the orthologs dataframe and replace empty cells with NAs
 orthologs <- orthologs %>% 
   rename_all(~gsub("_prot", "", .)) %>%
@@ -32,17 +35,21 @@ closest_species_dict <- hash(
 ordered_species <- c('dyak','dmel','dana','dpse','dper','dwil','dvir','dmoj',
                      'dvir','dwil','dper','dpse','dana','dmel','dyak')
 
-# create function to find the closest ortholog to each duplicate pair
+# create function to find the closest expressed ortholog to each duplicate pair
 find_closest_ortholog <- function(row,species) {
   closest_species <- closest_species_dict[[species]]
   closest_gene <- row[[closest_species]]
   
-  if (is.na(closest_gene) | grepl(',',closest_gene)){
+  if (is.na(closest_gene) | grepl(',',closest_gene) | (!closest_gene %in% expression$YOgnID)){
     n = 0
+    non_expressed = 0 
+    
     index <- min(which(ordered_species == closest_species))
     
-    while(is.na(closest_gene) | grepl(',',closest_gene)){
+    while(is.na(closest_gene) | grepl(',',closest_gene) | (!closest_gene %in% expression$YOgnID)){
       n = n + 1
+      non_expressed = non_expressed + 1
+      if ((index + n) > (length(ordered_species))) {return(NA)}
       closest_species <- ordered_species[index+n]
       closest_gene <- row[[closest_species]]
     }
@@ -61,6 +68,9 @@ for (row_num in 1:nrow(orthologs)) {
 # merge the ancestral copy with the duplicate pairs
 ancestral_copy <- orthologs[c('Orthogroup','ancestral_copy')]
 dups <- merge(dups,ancestral_copy,by='Orthogroup')
+
+# remove duplicates without ancestral copies (the orthologs they had weren't expressed)
+dups <- na.omit(dups)
 
 # write the duplicate pairs with their ancestral copy to file
 write.table(dups,'Dup_Pairs_Ancestral.tsv')
@@ -89,8 +99,6 @@ colnames(all_ortholog_pairs) <- c('Orthogroup','species.x','YOgn.x','species.y',
 
 
 # keep orthologs with expression data and are expressed in at least one tissue
-expression <- read.csv("./Expression_Data.tsv", sep="")
-
 expressed_ortholog_pairs <- all_ortholog_pairs %>%
   filter((YOgn.x %in% expression$YOgnID) & (YOgn.y %in% expression$YOgnID))
 
