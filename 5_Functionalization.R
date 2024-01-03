@@ -1,7 +1,6 @@
 
 
 
-
 source('./startup.R')
 
 
@@ -12,140 +11,97 @@ dups <- read.csv("./Dup_Pairs_Ancestral.tsv", sep="")
 ortho_pairs <- read.csv("./Ortholog_Pairs.tsv", sep="")
 
 # read in expression data 
-exp <- read.csv("./Expression_Data.tsv", sep="")
+raw_exp <- read.csv("./Expression_Data.tsv", sep="")
 
-
-
-
-# separate each gene id (dup1,dup2,ancestral,single copy one, single copy two)
-
-dup_1 <- dups[c('dup_1')]
-dup_2 <- dups[c('dup_2')]
-anc <- dups[c('ancestral_copy')]
-sc_x <- ortho_pairs[c('YOgn.x')]
-sc_y <- ortho_pairs[c('YOgn.y')]
-
-# get expression data for each single copy gene
-colnames(sc_x) <- 'YOgnID'
-exp_sc_x <- merge(sc_x,exp,by='YOgnID')
-colnames(sc_y) <- 'YOgnID'
-exp_sc_y <- merge(sc_y,exp,by='YOgnID')
-rm(sc_x, sc_y)
-
-# get expression data for dups and anc
+# calculate relative expression values 
+exp <- raw_exp
 rownames(exp) <- exp$YOgnID
 exp <- exp %>% select(-YOgnID)
-exp_dup_1 <- exp[row.names(exp) %in% dup_1$dup_1, ]
-exp_dup_2 <- exp[row.names(exp) %in% dup_2$dup_2, ]
-exp_anc <- exp[row.names(exp) %in% anc$ancestral_copy, ]
+exp <- exp / rowSums(exp)
+exp$YOgnID <- rownames(exp)
+exp <- exp[, c("YOgnID", setdiff(names(exp), "YOgnID"))]
 
-# get combined dup expression
-exp_dups_combined <- exp_dup_1 + exp_dup_2
+# get exp for dups and ancestral
+dup_1_exp <- exp %>% rename_at(-1, ~paste('dup_1_', ., sep = ''))
+dup_anc_exp <- dups %>%  merge(dup_1_exp, ., by.x = 'YOgnID', by.y ='dup_1') %>% rename(YOgnID = 'dup_1')
 
-# get relative expression levels 
-exp_dup_1 <- exp_dup_1 / rowSums(exp_dup_1)
-exp_dup_2 <- exp_dup_2 / rowSums(exp_dup_2)
-exp_anc <- exp_anc / rowSums(exp_anc)
-exp_dups_combined <- exp_dups_combined / rowSums(exp_dups_combined)
+dup_2_exp <- exp %>% rename_at(-1, ~paste('dup_2_', ., sep = ''))
+dup_anc_exp <- dup_anc_exp %>% merge(dup_2_exp, ., by.x = 'YOgnID', by.y ='dup_2') %>% rename(YOgnID = 'dup_2')
 
-# get relative expression levels for single copy genes
-rownames(exp_sc_x) <- make.names(exp_sc_x$YOgnID, unique=TRUE)
-exp_sc_x <- exp_sc_x %>% select(-YOgnID)
-rownames(exp_sc_y) <- make.names(exp_sc_y$YOgnID, unique=TRUE)
-exp_sc_y <- exp_sc_y %>% select(-YOgnID)
+anc_exp <- exp %>% rename_at(-1, ~paste('anc_', ., sep = ''))
+dup_anc_exp <- dup_anc_exp %>% merge(anc_exp, ., by.x = 'YOgnID', by.y ='ancestral_copy') %>% rename(YOgnID = 'anc')
 
-exp_sc_x <- exp_sc_x / rowSums(exp_sc_x)
-exp_sc_y <- exp_sc_y / rowSums(exp_sc_y)
+# get exp for ortholog pairs 
+ortho_x_exp <- exp %>% rename_at(-1, ~paste('ortho_x_', ., sep = ''))
+ortho_pair_exp <- ortho_pairs %>% merge(ortho_x_exp, ., by.x = 'YOgnID', by.y ='YOgn.x') %>% rename(YOgnID = 'ortho_x')
 
-# get euclidean distances (ed) values
-dup_1_a <- (rowSums((exp_dup_1 - exp_anc) ^ 2)) ^ (1/2)
-dup_2_a <- (rowSums((exp_dup_2 - exp_anc) ^ 2)) ^ (1/2)
-dups_combined_a <- (rowSums((exp_dups_combined - exp_anc) ^ 2)) ^ (1/2)
+ortho_y_exp <- exp %>% rename_at(-1, ~paste('ortho_y_', ., sep = ''))
+ortho_pair_exp <- ortho_pair_exp %>% merge(ortho_y_exp, ., by.x = 'YOgnID', by.y ='YOgn.y') %>% rename(YOgnID = 'ortho_y') %>%
+  select(-species.x, -species.y)
 
+# get combined expression values and after adding, calculate relative expression
+dup_1_exp <- raw_exp %>% rename_at(-1, ~paste('dup_1_', ., sep = ''))
+dups_combined_exp <- dups %>%  merge(dup_1_exp, ., by.x = 'YOgnID', by.y ='dup_1') %>% rename(YOgnID = 'dup_1')
 
-## OLD script:
+dup_2_exp <- raw_exp %>% rename_at(-1, ~paste('dup_2_', ., sep = ''))
+dups_combined_exp <- dups_combined_exp %>% merge(dup_2_exp, ., by.x = 'YOgnID', by.y ='dup_2') %>% rename(YOgnID = 'dup_2')
 
-
-
-
-
-
-
-# get single copy ed values
-sc$gn_2 <- make.names(sc$gn_2, unique=TRUE)
-rownam <- rownames(exp_sc_y)
-match_positions <- match(sc$gn_2, rownam)
-rn <- rownam[match_positions]
-exp_sc_y <- exp_sc_y[rn, ]
-
-# calculate the sc euclidean distance
-exp_sc <- exp_sc_x - exp_sc_y
-exp_sc <- exp_sc ^ 2
-exp_sc <- rowSums(exp_sc)
-sc_ed <- exp_sc ^ (1/2)
-sc_ed <- as.data.frame(sc_ed)
-
-# classify into functional groups 
-ed <- as.data.frame(cbind(dup_1_a, dup_2_a, dups_combined_a))
-
-# remove duplicates with any non-expressed pairs
-ed <- na.omit(ed)
-
-# classify
-
-sc_ed <- na.omit(sc_ed)
-
-
-
-
-ed$conserv <- NA
-ed$neo_dup1 <- NA
-ed$neo_dup2 <- NA
-ed$subfun <- NA
-ed$specializ <- NA
-
-sc_ed$sc_ed <- sc_ed$sc_ed / 2
-
-
-
-for (row_num in 1:nrow(ed)){
-  
-  sample <- as.data.frame(sample(sc_ed$sc_ed,size=1000))
-  colnames(sample) <- 'sc_ed'
-  
-  d1 <- ed[row_num,1]
-  d2 <- ed[row_num,2]
-  dd <- ed[row_num,3]
-  
-  ed[row_num,'conserv'] <- sum((d1 <= sample$sc_ed) & (d2 <= sample$sc_ed))
-  ed[row_num,'neo_dup1'] <- sum((d1 > sample$sc_ed & d2 <= sample$sc_ed))
-  ed[row_num,'neo_dup2'] <- sum((d1 <= sample$sc_ed & d2 > sample$sc_ed))
-  ed[row_num,'subfun'] <- sum((d1 > sample$sc_ed & d2 > sample$sc_ed & dd <= sample$sc_ed))
-  ed[row_num,'specializ'] <- sum((d1 > sample$sc_ed & d2 > sample$sc_ed & dd > sample$sc_ed))
-  
+tissue_names <- c('f_ac','f_dg','f_go','f_hd','f_re','f_tx','f_wb',
+                  'm_ac','m_dg','m_go','m_hd','m_re','m_tx','m_wb')
+for (tissue in tissue_names) {
+  dups_combined_exp <- dups_combined_exp %>%
+    rowwise() %>%
+    mutate("{tissue}" :=  sum(c_across(ends_with(tissue)), na.rm = TRUE))
 }
 
+dups_combined_exp <- dups_combined_exp %>% 
+  select(Orthogroup,all_of(tissue_names))
 
-ed$func <- names(ed[, 4:8])[apply(ed[, 4:8], 1, which.max)]
+# calculate relative expression values of combined 
+dups_combined_exp <- as.data.frame(dups_combined_exp) 
+rownames(dups_combined_exp) <- dups_combined_exp$Orthogroup
+dups_combined_exp <- dups_combined_exp %>% select(-Orthogroup)
+dups_combined_exp <- dups_combined_exp / rowSums(dups_combined_exp)
+dups_combined_exp$Orthogroup <- rownames(dups_combined_exp)
 
-table(ed$func)
+# add combined expression values to the dup_anc_exp dataframe  
+dups_combined_exp <- dups_combined_exp %>% rename_at(-ncol(dups_combined_exp), ~paste('d1d2_', ., sep = ''))
+dup_anc_exp <- merge(dups_combined_exp,dup_anc_exp,by='Orthogroup')
 
-# not divided by 2:
-#  conserv  neo_dup1  neo_dup2 specializ    subfun 
-# 266       158       144       610         3 
+# calculate euclidean distance values 
+ed_values <- dup_anc_exp %>%
+  select(-dup_1, -dup_2, -anc) %>%
+  mutate(dup1_a = sqrt(rowSums((select(., starts_with('dup_1')) - select(., starts_with('anc_'))) ^ 2))) %>%
+  mutate(dup2_a = sqrt(rowSums((select(., starts_with('dup_2')) - select(., starts_with('anc_'))) ^ 2))) %>%
+  mutate(d1d2_a = sqrt(rowSums((select(., starts_with('d1d2_')) - select(., starts_with('anc_'))) ^ 2))) %>%
+  select(Orthogroup, dup1_a, dup2_a, d1d2_a)
+
+sc_ed_values <- ortho_pair_exp %>%
+  select(-ortho_x, -ortho_y) %>%
+  mutate(sc_ed = sqrt(rowSums((select(., starts_with('ortho_x')) - select(., starts_with('ortho_y'))) ^ 2))) %>%
+  select(Orthogroup, sc_ed)
+  
+
+# calculate the cutoff ed value 
+iqr <- IQR(sc_ed_values$sc_ed) / 2
+cutoff <- median(sc_ed_values$sc_ed) + iqr
+#cutoff <- cutoff /2
 
 
-# format results
-ed$dup_1 <- rownames(ed)
-ed <- merge(ed,dups,by='dup_1')
-ed <- ed[,c(1,11,12,2:4,10,5:8)]
+# use euclidean distance values to classify into functional groups 
+func <- ed_values %>%
+  rowwise() %>%
+  mutate(func = case_when((dup1_a <= cutoff) & (dup2_a <= cutoff) ~ 'conserv',
+                          (dup1_a > cutoff) & (dup2_a <= cutoff) ~ 'neo_dup1',
+                          (dup1_a <= cutoff & dup2_a > cutoff) ~ 'neo_dup2',
+                          (dup1_a > cutoff & dup2_a > cutoff & d1d2_a <= cutoff) ~ 'subfun',
+                          (dup1_a > cutoff & dup2_a > cutoff & d1d2_a > cutoff) ~ 'specializ'))
 
-# write to file
+# add dup and anc gene ids to func 
+func <- merge(dups,func,by='Orthogroup')
 
-
-
-
-
+# write functionalization results to file
+write.table(func, file= 'Dup_Functionalizations.tsv')
 
 
 
