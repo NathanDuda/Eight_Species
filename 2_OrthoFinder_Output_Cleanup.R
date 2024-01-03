@@ -68,37 +68,53 @@ dups <- two_to_ones %>%
   select(-temp_column)
 
 # keep only duplicate pairs with expression 
-all_expression <- read.delim("./Raw_Data/YO_Expression/all_expression.txt")
-all_expression <- all_expression %>% select(-jaccard, -FBgnID)
-all_expression <- all_expression %>% 
-  rename_all(~gsub("^dana_", "", .)) %>%
-  filter(!is.na(as.numeric(f_ac_R1))) %>%
-  mutate(across(2:ncol(all_expression), as.numeric)) 
+species_names <- c('dana','dmel','dmoj','dper','dpse','dvir','dwil','dyak')
 
-# get average expression value for replicates
-tissue_names <- c('f_ac','f_dg','f_go','f_hd','f_re','f_tx','f_wb',
-                  'm_ac','m_dg','m_go','m_hd','m_re','m_tx','m_wb')
-
-for (tissue in tissue_names) {
-  all_expression <- all_expression %>%
-    mutate("{tissue}" := rowMeans(select(., starts_with(tissue)), na.rm = TRUE))
+all_expression <- data.frame()
+for (species in species_names){
+  
+  expression <- read.delim(paste0('./Raw_Data/YO_Expression/GSE99574_HiSAT2_',species,'.nrc.YO.txt'))
+  expression <- expression %>% select(-jaccard, -FBgnID)
+  
+  # remove the unique species names in dmel 
+  if (species == 'dmel') {
+    expression <- expression %>%
+      rename_all(~ ifelse(startsWith(., "w1118"), paste0(., "1"), .)) %>% # prevent duplicate column names
+      rename_all(~ gsub(paste0('w1118_'), "", .)) %>%
+      rename_all(~ gsub(paste0('oreR_'), "", .))
+    }
+  
+  expression <- expression %>% 
+    rename_all(~ gsub(paste0(species,"_"), "", .)) %>%
+    mutate(across(2:ncol(expression), as.numeric)) 
+  
+  # get average expression value for replicates
+  tissue_names <- c('f_ac','f_dg','f_go','f_hd','f_re','f_tx','f_wb',
+                    'm_ac','m_dg','m_go','m_hd','m_re','m_tx','m_wb')
+  
+  for (tissue in tissue_names) {
+    expression <- expression %>%
+      mutate("{tissue}" := rowMeans(select(., starts_with(tissue)), na.rm = TRUE))
+  }
+  
+  # filter out genes with no expression in all tissues 
+  expressed_genes <- expression %>%
+    select(YOgnID,all_of(tissue_names)) %>%
+    filter(rowSums(select(., 2:15)) > 0)
+  
+  all_expression <- rbind(all_expression,expressed_genes)
 }
 
-# filter out genes with no expression in all tissues 
-expressed_genes <- all_expression %>%
-  select(YOgnID,all_of(tissue_names)) %>%
-  filter(rowSums(select(., 2:15)) > 0)
-
 # write expressed genes to file
-write.table(expressed_genes,'Expression_Data.tsv')
+write.table(all_expression,'Expression_Data.tsv')
 
 
 # keep only expressed duplicates 
-colnames(expressed_genes)[1] <- 'dup_1'
-dups_expressed <- merge(dups,expressed_genes,by='dup_1')
+colnames(all_expression)[1] <- 'dup_1'
+dups_expressed <- merge(dups,all_expression,by='dup_1')
 
-colnames(expressed_genes)[1] <- 'dup_2'
-dups_expressed <- merge(dups_expressed,expressed_genes,by='dup_2')
+colnames(all_expression)[1] <- 'dup_2'
+dups_expressed <- merge(dups_expressed,all_expression,by='dup_2')
 
 # write duplicate pairs to file
 dups <- dups_expressed[c('Orthogroup','dup_1','dup_2')]
