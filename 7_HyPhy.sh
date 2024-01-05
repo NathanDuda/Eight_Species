@@ -23,13 +23,26 @@ for file in ./OrthoFinder_Output/Results_Jan01/Gene_Trees/*; do
 done
 
 
-# run hyphy busted on orthogroups 
+# run hyphy busted on orthogroups (with at least 4 sequences bc then tree was made for it)
+
+max_parallel=5
+current_jobs=0
+
 for orthogroup_file in ./Grouped_Fastas/One_to_Two_Orthogroups/Codon_Alignments/*; do
- filename=$(basename "$orthogroup_file")
- filename="${filename%.*}"
- hyphy busted --alignment "./Grouped_Fastas/One_to_Two_Orthogroups/Codon_Alignments/${filename}.fa" --tree "./OrthoFinder_Output/Results_Jan01/Gene_Trees/${filename}_tree.txt" --output "./Evolutionary_Rate/HyPhy_bt_Orthogroup_Output/${filename}.txt" &
+ if [[ $(grep -c '>' "$orthogroup_file") -ge 4 ]]; then
+  filename=$(basename "$orthogroup_file")
+  filename="${filename%.*}"
+  hyphy busted --alignment "./Grouped_Fastas/One_to_Two_Orthogroups/Codon_Alignments/${filename}.fa" --tree "./OrthoFinder_Output/Results_Jan01/Gene_Trees/${filename}_tree.txt" --output "./Evolutionary_Rate/HyPhy_busted_Orthogroup_Output/${filename}.txt" &
+ 
+  ((current_jobs++))
+  if ((current_jobs >= max_parallel)); then
+    wait
+    current_jobs=0
+  fi
+ fi 
 done
-stop
+wait
+
 
 
 
@@ -51,13 +64,18 @@ done
 
 # get list of all files to run MEGA on 
 rename 's/\.fa$/\.meg/' ./Grouped_Fastas/One_to_One_Orthogroups/Codon_Alignments/*.fa
-ls -d ./Grouped_Fastas/One_to_One_Orthogroups/Codon_Alignments/*.meg > ./MEGA_Phylogeny/file_list.txt
-sort ./MEGA_Phylogeny/file_list.txt -n > ./MEGA_Phylogeny/sorted_file_list.txt
 
+for file in ./Grouped_Fastas/One_to_One_Orthogroups/Codon_Alignments/*.meg; do
+  echo -e "#MEGA\nTITLE" | cat - "$file" > temp && mv temp "$file"
+  sed -i 's/>/#/g' "$file"
+  unix2dos "$file"
+done
+
+ls -d /mnt/c/Users/17735/Downloads/Eight_Species/Grouped_Fastas/One_to_One_Orthogroups/Codon_Alignments/*.meg > ./MEGA_Phylogeny/file_list.txt
+sort ./MEGA_Phylogeny/file_list.txt -n > ./MEGA_Phylogeny/sorted_file_list.txt
+rm ./MEGA_Phylogeny/file_list.txt
 
 # run MEGA
-megacc -a ./MEGA_Phylogeny/infer_NJ_amino_acid.mao -d ./MEGA_Phylogeny/sorted_file_list.txt -o MEGA_output.fasta
-
-
+megacc -a ./MEGA_Phylogeny/infer_NJ_amino_acid.mao -d ./MEGA_Phylogeny/sorted_file_list.txt -o ./MEGA_Phylogeny/MEGA_Output/MEGA_output
 
 
