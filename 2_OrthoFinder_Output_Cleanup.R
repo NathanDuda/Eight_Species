@@ -1,5 +1,6 @@
 
 # this script also cleans up the raw expression data 
+# and calculates tau for every expressed gene
 
 
 source('./startup.R')
@@ -120,5 +121,23 @@ dups_expressed <- merge(dups_expressed,all_expression,by='dup_2')
 dups <- dups_expressed[c('Orthogroup','dup_1','dup_2')]
 write.table(dups, file = 'Duplicate_Pairs.tsv')
 
+
+
+# calculating tau for every expressed gene
+
+# remotes::install_github("roonysgalbi/tispec")
+library(tispec)
+
+colnames(all_expression)[1] <- 'YOgnID'
+rownames(all_expression) <- all_expression$YOgnID
+all_expression <- all_expression %>% select(-YOgnID)
+
+tau <- calcTau(all_expression)
+
+tau$YOgnID <- rownames(tau)
+tau <- tau[c('YOgnID','tau')]
+
+# write tau to file
+write.table(tau, file= 'Tau.tsv')
 
 
