@@ -87,3 +87,21 @@ rm ./MEGA_Phylogeny/sorted_file_list.txt
 megacc -a ./MEGA_Phylogeny/infer_NJ_amino_acid.mao -d ./MEGA_Phylogeny/file_list.txt -o ./MEGA_Phylogeny/MEGA_Output/MEGA_output
 
 
+# concatenate all output newicks into one file 
+cat ./MEGA_Phylogeny/MEGA_Output/*_consensus.nwk > ./MEGA_Phylogeny/MEGA_consensus_Newicks.txt
+sed -E 's/(YOgn[A-Z][A-Z])[0-9]+:/\1:/g' ./MEGA_Phylogeny/MEGA_consensus_Newicks.txt > ./MEGA_Phylogeny/MEGA_consensus_Newicks_temp.txt
+sed -E 's/(YOgn[A-Z][A-Z])[0-9]+,/\1:/g' ./MEGA_Phylogeny/MEGA_consensus_Newicks_temp.txt > ./MEGA_Phylogeny/MEGA_consensus_Newicks.txt
+sed -E 's/(YOgn[A-Z][A-Z])[0-9]+/\1:/g' ./MEGA_Phylogeny/MEGA_consensus_Newicks.txt > ./MEGA_Phylogeny/MEGA_consensus_Newicks_temp.txt
+sed 's/:/,/g' ./MEGA_Phylogeny/MEGA_consensus_Newicks_temp.txt > ./MEGA_Phylogeny/MEGA_consensus_Newicks.txt
+sed 's/,)/)/g' ./MEGA_Phylogeny/MEGA_consensus_Newicks.txt > ./MEGA_Phylogeny/MEGA_consensus_Newicks_temp.txt
+mv ./MEGA_Phylogeny/MEGA_consensus_Newicks_temp.txt ./MEGA_Phylogeny/MEGA_consensus_Newicks.txt
+
+
+cat ./MEGA_Phylogeny/MEGA_Output/*\).nwk > ./MEGA_Phylogeny/MEGA_Newicks.txt
+sed -E 's/(YOgn[A-Z][A-Z])[0-9]+:/\1:/g' ./MEGA_Phylogeny/MEGA_Newicks.txt > ./MEGA_Phylogeny/MEGA_Newicks_temp.txt
+sed -E 's/(YOgn[A-Z][A-Z])[0-9]+,/\1:/g' ./MEGA_Phylogeny/MEGA_Newicks_temp.txt > ./MEGA_Phylogeny/MEGA_Newicks.txt
+
+
+#rm ./MEGA_Phylogeny/MEGA_consensus_Newicks_temp.txt
+
+

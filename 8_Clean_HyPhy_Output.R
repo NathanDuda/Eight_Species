@@ -4,6 +4,8 @@
 source('./startup.R')
 
 
+### clean HyPhy output:
+
 # iterate over each hyphy output file to get branch-specific selection values (branches of gene tree of orthogroup)
 p = 0 
 entire_hyphy_output <- data.frame()
@@ -101,5 +103,40 @@ orthogroups_omega <- orthogroups_omega %>%
 
 # write hyphy results for each orthogroup to file 
 write.table(orthogroups_omega, file = './orthogroups_omega.tsv')
+
+
+
+### clean MEGA output:
+library(phytools)
+library(ape)
+
+# read in the newick trees
+trees <- ape::read.tree('./MEGA_Phylogeny/MEGA_consensus_Newicks.txt')
+trees <- ape::read.tree('./MEGA_Phylogeny/MEGA_Newicks.txt')
+
+# make sure all trees have 8 tips. Nothing should print
+for (tree in trees){if (length(tree$tip.label) != 8) {print(tree['tip.label'])}}
+
+# make the consensus tree from all the trees 
+consensus_tree <- ape::consensus(trees, check.labels = F, p = 0.5,
+                                 rooted = F)
+
+# calculate the least squares consensus tree 
+consensus_tree <- ls.consensus(trees)
+
+# add root by using midpoint as root
+consensus_tree <- midpoint.root(consensus_tree)
+
+# rename the tips 
+consensus_tree[["tip.label"]] <- c('dyak','dmel','dmoj','dvir','dper','dpse','dwil','dana')
+
+# plot the phylogeny
+plotTree(consensus_tree)
+
+# save the phylogeny to a file 
+jpeg("./Plots/Phylogeny.jpg", height = 500, width =850)
+plotTree(consensus_tree)
+dev.off()
+
 
 

@@ -35,6 +35,9 @@ yogn_yotr <- longest_transcript[c('YOgn','YOtr')]
 exon_counts <- merge(yogn_yotr,exon_counts,by='YOtr')
 exon_counts <- exon_counts[c('YOgn','n_exons')]
 
+# write exon counts to file
+write.table(exon_counts, file = './Exon_counts.tsv')
+
 # merge exon counts with duplicate genes 
 colnames(exon_counts) <- c('dup_1','dup_1_n_exons')
 dup_exons <- left_join(dups,exon_counts,by='dup_1')

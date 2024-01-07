@@ -21,6 +21,8 @@ exp <- exp / rowSums(exp)
 exp$YOgnID <- rownames(exp)
 exp <- exp[, c("YOgnID", setdiff(names(exp), "YOgnID"))]
 
+write.table(exp,'./Relative_Expression.tsv')
+
 # get exp for dups and ancestral
 dup_1_exp <- exp %>% rename_at(-1, ~paste('dup_1_', ., sep = ''))
 dup_anc_exp <- dups %>%  merge(dup_1_exp, ., by.x = 'YOgnID', by.y ='dup_1') %>% rename(YOgnID = 'dup_1')
