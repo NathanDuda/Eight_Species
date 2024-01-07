@@ -51,8 +51,8 @@ dup_exons <- dup_exons %>% mutate_all(~ ifelse(is.na(.), 1, .))
 
 # classify as DNA- or RNA-mediated based on exon number
 dup_exons <- dup_exons %>%
-  mutate(mech = case_when(dup_1_n_exons > 1 & dup_2_n_exons == 1 ~ 'RNA',
-                          dup_2_n_exons > 1 & dup_1_n_exons == 1 ~ 'RNA',
+  mutate(mech = case_when(dup_1_n_exons > 1 & dup_2_n_exons == 1 ~ 'RNA_dup_2',
+                          dup_2_n_exons > 1 & dup_1_n_exons == 1 ~ 'RNA_dup_1',
                           dup_1_n_exons > 1 & dup_2_n_exons > 1 ~ 'DNA',
                           dup_2_n_exons > 1 & dup_1_n_exons > 1 ~ 'DNA',
                           dup_2_n_exons == 1 & dup_1_n_exons == 1 ~ 'unknown'))

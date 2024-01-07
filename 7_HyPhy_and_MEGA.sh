@@ -76,10 +76,14 @@ sort ./MEGA_Phylogeny/file_list.txt -n > ./MEGA_Phylogeny/sorted_file_list.txt
 
 sed 's|/mnt/c/Users/17735/Downloads/Eight_Species/Grouped_Fastas/One_to_One_Orthogroups/Codon_Alignments/OG0002391.meg||' ./MEGA_Phylogeny/sorted_file_list.txt > ./MEGA_Phylogeny/file_list.txt
 sed 's|/mnt/c/Users/17735/Downloads/Eight_Species/Grouped_Fastas/One_to_One_Orthogroups/Codon_Alignments/OG0003946.meg||' ./MEGA_Phylogeny/file_list.txt > ./MEGA_Phylogeny/sorted_file_list.txt
+sed 's|/mnt/c/Users/17735/Downloads/Eight_Species/Grouped_Fastas/One_to_One_Orthogroups/Codon_Alignments/OG0004744.meg||' ./MEGA_Phylogeny/sorted_file_list.txt > ./MEGA_Phylogeny/file_list.txt
+sed 's|/mnt/c/Users/17735/Downloads/Eight_Species/Grouped_Fastas/One_to_One_Orthogroups/Codon_Alignments/OG0005168.meg||' ./MEGA_Phylogeny/file_list.txt > ./MEGA_Phylogeny/sorted_file_list.txt
 
-rm ./MEGA_Phylogeny/file_list.txt
+tac ./MEGA_Phylogeny/sorted_file_list.txt > ./MEGA_Phylogeny/file_list.txt
+
+rm ./MEGA_Phylogeny/sorted_file_list.txt
 
 # run MEGA
-megacc -a ./MEGA_Phylogeny/infer_NJ_amino_acid.mao -d ./MEGA_Phylogeny/sorted_file_list.txt -o ./MEGA_Phylogeny/MEGA_Output/MEGA_output
+megacc -a ./MEGA_Phylogeny/infer_NJ_amino_acid.mao -d ./MEGA_Phylogeny/file_list.txt -o ./MEGA_Phylogeny/MEGA_Output/MEGA_output
 
 

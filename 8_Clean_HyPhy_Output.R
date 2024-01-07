@@ -89,9 +89,15 @@ orthogroups_omega <- merge(orthogroup_gn,entire_hyphy_output,by='id')
 
 colnames(orthogroups_omega) <- 
   c('id','Orthogroup','species','MG94xREV','MG94xREV_omega','corrected_pval',
-  'full_adaptive_model(f.a.m.)','f.a.m._Dn','f.a.m._Ds','LRT','Nuc_GTR','rate_distributions_1',
+  'full_adaptive_model','full_adaptive_model_Dn','full_adaptive_model_Ds','LRT','Nuc_GTR','rate_distributions_1',
   'rate_distributions_2','rate_classes','uncorrected_pval','rate_distributions_3','rate_distributions_4',
   'rate_distributions_5','rate_distributions_6','rate_distributions_7','rate_distributions_8')
+
+# categorize each row as dup or ortho 
+orthogroups_omega <- orthogroups_omega %>%
+  group_by(Orthogroup,species) %>%
+  mutate(dup_or_ortho = case_when(n() == 2 ~ 'dup',
+                                  n() == 1 ~ 'ortho'))
 
 # write hyphy results for each orthogroup to file 
 write.table(orthogroups_omega, file = './orthogroups_omega.tsv')
