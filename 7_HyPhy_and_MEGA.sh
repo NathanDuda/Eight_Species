@@ -73,6 +73,10 @@ done
 
 ls -d /mnt/c/Users/17735/Downloads/Eight_Species/Grouped_Fastas/One_to_One_Orthogroups/Codon_Alignments/*.meg > ./MEGA_Phylogeny/file_list.txt
 sort ./MEGA_Phylogeny/file_list.txt -n > ./MEGA_Phylogeny/sorted_file_list.txt
+
+sed 's|/mnt/c/Users/17735/Downloads/Eight_Species/Grouped_Fastas/One_to_One_Orthogroups/Codon_Alignments/OG0002391.meg||' ./MEGA_Phylogeny/sorted_file_list.txt > ./MEGA_Phylogeny/file_list.txt
+sed 's|/mnt/c/Users/17735/Downloads/Eight_Species/Grouped_Fastas/One_to_One_Orthogroups/Codon_Alignments/OG0003946.meg||' ./MEGA_Phylogeny/file_list.txt > ./MEGA_Phylogeny/sorted_file_list.txt
+
 rm ./MEGA_Phylogeny/file_list.txt
 
 # run MEGA
