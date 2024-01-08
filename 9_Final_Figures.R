@@ -6,7 +6,10 @@ source('./startup.R')
 
 dups <- read.csv("./Dup_Pairs_Ancestral.tsv", sep="")
 
-exp <- read.csv("./Relative_Expression.tsv", sep="")
+orthogroups <- read.csv("./Dup_Pair_Orthologs.tsv", sep="")
+
+exp_rel <- read.csv("./Relative_Expression.tsv", sep="")
+exp <- read.csv("./Expression_Data.tsv", sep="")
 
 tau <- read.csv("./Tau.tsv", sep="")
 
@@ -243,7 +246,7 @@ ggsave(filename = './Plots/tau_boxplot.jpg', width = 7, height = 4)
 
 # tissue expression heatmap 
 
-tissue_exp <- pivot_longer(exp, cols = c('f_ac':'m_wb'))
+tissue_exp <- pivot_longer(exp_rel, cols = c('f_ac':'m_wb'))
 
 all_tissue_exp <- merge(tissue_exp,all_tau,by='YOgnID')
 
@@ -284,292 +287,154 @@ colnames(seqs)[1] <- 'id'
 
 p_val_analyses <- merge(p_val_analyses,seqs,by='id')
 
-#
+# calculate p values
+n_exons_pval <- t.test(p_val_analyses$n_exons[p_val_analyses$category=='All_Dup'],
+                       p_val_analyses$n_exons[p_val_analyses$category=='All_Ortho'])
+n_exons_pval <- n_exons_pval$p.value
+n_exons_dup <- mean(p_val_analyses$n_exons[p_val_analyses$category=='All_Dup'])
+n_exons_ortho <- mean(p_val_analyses$n_exons[p_val_analyses$category=='All_Ortho'])
 
 
-# absolute expression level
-# sequence similarity ?
+gc_content_pval <- t.test(p_val_analyses$gc_content[p_val_analyses$category=='All_Dup'],
+                          p_val_analyses$gc_content[p_val_analyses$category=='All_Ortho'])
+gc_content_pval <- gc_content_pval$p.value
+gc_content_dup <- mean(p_val_analyses$gc_content[p_val_analyses$category=='All_Dup'])
+gc_content_ortho <- mean(p_val_analyses$gc_content[p_val_analyses$category=='All_Ortho'])
 
 
+prot_length_pval <- t.test(p_val_analyses$prot_length[p_val_analyses$category=='All_Dup'],
+                           p_val_analyses$prot_length[p_val_analyses$category=='All_Ortho'])
+prot_length_pval <- prot_length_pval$p.value
+prot_length_dup <- mean(p_val_analyses$prot_length[p_val_analyses$category=='All_Dup'])
+prot_length_ortho <- mean(p_val_analyses$prot_length[p_val_analyses$category=='All_Ortho'])
 
 
+# absolute mean expression level 
+tissue_exp <- exp %>%
+  pivot_longer(., cols = c('f_ac':'m_wb')) %>%
+  group_by(YOgnID) %>%
+  mutate(value = sum(value)) %>%
+  select(-name) %>%
+  distinct()
+
+colnames(tissue_exp)[1] <- 'id'
+abs_exp <- merge(p_val_analyses, tissue_exp, by = 'id')
+
+
+abs_exp_pval <- t.test(abs_exp$value[abs_exp$category=='All_Dup'],
+                       abs_exp$value[abs_exp$category=='All_Ortho'])
+abs_exp_pval <- abs_exp_pval$p.value
+abs_exp_dup <- mean(abs_exp$value[abs_exp$category=='All_Dup'])
+abs_exp_ortho <- mean(abs_exp$value[abs_exp$category=='All_Ortho'])
+
+
+### absolute expression ratio of duplicate pairs versus ancestral copy
+
+# get expression values for each duplicate copy
+dup1_exp <- exp %>% rename_at(-1, ~paste('dup1_', ., sep = '')) %>% rename_with(~ paste0("dup_1", names(.)[1]), 1)
+dups_exp <- merge(dup1_exp,dups,by='dup_1')
+
+dup2_exp <- exp %>% rename_at(-1, ~paste('dup2_', ., sep = '')) %>% rename_with(~ paste0("dup_2", names(.)[1]), 1)
+dups_exp <- merge(dup2_exp,dups_exp,by='dup_2')
+
+anc_exp <- exp %>% rename_at(-1, ~paste('anc_', ., sep = '')) %>% rename_with(~ paste0("ancestral_copy", names(.)[1]), 1)
+dups_exp <- merge(anc_exp,dups_exp,by='ancestral_copy')
+
+
+# calculate absolute expression ratio 
+ratio <- dups_exp %>%
+  select(-dup_1, -dup_2, -ancestral_copy) %>%
+  mutate(dup1_sum = rowSums(select(., starts_with('dup1')))) %>%
+  mutate(dup2_sum = rowSums(select(., starts_with('dup2')))) %>%
+  mutate(anc_sum = rowSums(select(., starts_with('anc_')))) %>%
+  select(Orthogroup, dup1_sum, dup2_sum, anc_sum) %>%
+  mutate(ratio=(dup1_sum + dup2_sum) / anc_sum) 
+
+median(ratio$ratio)
+# 1:1.05 ratio compared to 1:2, suggesting dosage is in effect (explains conservation)
+
+sd(ratio$ratio)
+# but huge standard deviation 
+
+ggplot(ratio, aes(x=ratio)) +
+  geom_density() +
+  xlim(0,10) +
+  geom_vline(xintercept =1)
+
+###
+
+
+# get number of genes in each orthogroup
+n_gene_per_orthogroup <- orthogroups %>%
+  mutate_all(~na_if(., "")) %>%
+  mutate(n_genes = 9 - rowSums(is.na(.))) %>%
+  select(Orthogroup,n_genes)
 
 # correlation matrix plot 
+corr_plot <- merge(tissue_exp,p_val_analyses, by = 'id')
+corr_plot <- merge(corr_plot,tau,by.x='id', by.y='YOgnID')
 
+dup_corr_plot <- merge(corr_plot,all_dups,by='id')
+dup_corr_plot <- merge(dup_corr_plot,n_gene_per_orthogroup,by='Orthogroup')
 
+ortho_corr_plot <- merge(corr_plot,all_ortho,by='id')
+ortho_corr_plot <- merge(ortho_corr_plot,n_gene_per_orthogroup,by='Orthogroup')
 
-
-##
-# add GC content
-
-# read in duplicate and ortho information
-dups <- read.csv("C:/Users/17735/Downloads/Duplicate_Pairs_Project/Final_Figures/Input_Files/Dups_Master_File.tsv", sep="")
-orthos <- read.csv("C:/Users/17735/Downloads/Duplicate_Pairs_Project/Final_Figures/Input_Files/Orthos_Master_File.tsv", sep="")
-
-# read in fasta and exon information for all genes 
-eight_species <- read.csv("C:/Users/17735/Downloads/Duplicate_Pairs_Project/Identifying_Duplicate_Pairs/Input_Files/EightSpecies.tsv", sep="")
-
-library(Biostrings)
-
-gc <- eight_species[,c(5,9)]
-gc <- na.omit(gc)
-
-colnames(gc) <- c('gn','nuc')
-
-gc$nuc <- trimws(gc$nuc)
-
-gc <- gc[!grepl("o", gc$nuc), ]
-
-library(stringr)
-gc$gc_content <- str_count(gc$nuc, "[GC]") / nchar(gc$nuc) * 100
-
-gc <- gc[!duplicated(gc),]
-
-# merge with dup and ortho dfs
-
-colnames(gc)[1] <- 'dup_gn'
-dups <- merge(dups,gc,by='dup_gn')
-
-colnames(gc)[1] <- 'ortho_gn'
-orthos <- merge(orthos,gc,by='ortho_gn')
-
-dups_orig <- dups
-orthos_orig <- orthos
-
-## 
-# add expression divergence
-dups <- read.csv("C:/Users/17735/Downloads/Duplicate_Pairs_Project/Identifying_Duplicate_Pairs/Input_Files/Duplicate_Pairs_Information.tsv", sep="")
-dups <- dups[,c(9,15)]
-
-dup_1 <- dups[1]
-dup_2 <- dups[2]
-
-colnames(dup_1) <- 'gn'
-colnames(dup_2) <- 'gn'
-
-# read in expression data
-exp <- read.csv("C:/Users/17735/Downloads/Duplicate_Pairs_Project/Identifying_Duplicate_Pairs/Input_Files/Expression_Data.tsv", sep="")
-
-# merge duplicate copies with their expression data
-colnames(exp)[1] <- 'gn'
-dup_1 <- merge(dup_1,exp,by='gn')
-dup_2 <- merge(dup_2,exp,by='gn')
-
-# calculate euclidean distances between copies 
-rownames(dup_1) <- dup_1$gn
-dup_1 <- dup_1[,-c(1)]
-
-rownames(dup_2) <- dup_2$gn
-dup_2 <- dup_2[,-c(1)]
-
-dup_ed <- (rowSums((dup_1 - dup_2) ^ 2)) ^ (1/2)
-dups$ed <- dup_ed
-
-# merge back 
-#dups_orig <- read.csv("C:/Users/17735/Downloads/Duplicate_Pairs_Project/Final_Figures/Input_Files/Dups_Master_File.tsv", sep="")
-
-dup1 <- dups[,c(1,3)]
-dups <- dups[,c(2,3)]
-
-colnames(dup1) <- c('dup_gn','Expression Divergence')
-colnames(dups) <- c('dup_gn','Expression Divergence')
-
-dups <- rbind(dups,dup1)
-
-dups <- merge(dups_orig,dups,by='dup_gn')
-##
 
 # make correlation matrix for duplicates
-
-dups_orig <- dups
+dup_corr_plot <- dup_corr_plot[c('n_exons','prot_length','full_adaptive_model_Dn','full_adaptive_model_Ds','MG94xREV_omega','tau','value','gc_content','n_genes')]
+dup_corr_plot <- dup_corr_plot %>% mutate_all(~ as.numeric(.))
 
 library(ggcorrplot)
-dups <- dups[,c(2:7,10:13,30,31)]
-dups <- dups[!dups$dup_dnds==Inf,]
+dup_corr_plot <- cor(dup_corr_plot)
+colnames(dup_corr_plot) <- c('Exon Amount','Length (bp)','Dn','Ds','Dn/Ds','Tau','Expression Level','GC Content','Genes in Orthogroup')
+rownames(dup_corr_plot) <- colnames(dup_corr_plot)
 
-
-dup_cor <- cor(dups)
-colnames(dup_cor) <- c('Exons','Length (bp)','Sequence Similarity','Dn','Ds','Dn/Ds','PPI','Tau','Tissues Expressed in','Expression Level','GC Content','Expression Divergence')
-rownames(dup_cor) <- c('Exons','Length (bp)','Sequence Similarity','Dn','Ds','Dn/Ds','PPI','Tau','Tissues Expressed in','Expression Level','GC Content','Expression Divergence')
-dup_cor <- dup_cor[, c('Exons','Length (bp)','GC Content','Sequence Similarity','Dn','Ds','Dn/Ds','PPI','Tau','Tissues Expressed in','Expression Level','Expression Divergence')]
-dup_cor <- dup_cor[c('Exons','Length (bp)','GC Content','Sequence Similarity','Dn','Ds','Dn/Ds','PPI','Tau','Tissues Expressed in','Expression Level','Expression Divergence'),]
-dup_pmat <- cor_pmat(dup_cor)
+dup_pmat <- cor_pmat(dup_corr_plot)
 
 library(grDevices)
 library(corrplot)
-pdf(file="./Input_Files/Dup_Correlation_Matrix.pdf", height=10, width=10)
-corrplot(dup_cor, p.mat=dup_pmat, method="circle", type="lower",sig.level=c(0.0001,0.001,0.01, 0.05),
+pdf(file="./Plots/dup_correlation_matrix.pdf", height=5, width=5)
+corrplot(dup_corr_plot, p.mat=dup_pmat, method="circle", type="lower",sig.level=c(0.0001,0.001,0.01, 0.05),
          insig="label_sig", pch.col="white", tl.col="black",
          diag=FALSE, pch.cex=1.6, col=colorRampPalette(c("darkred","white","darkgreen"))(200))
 dev.off()
 
-
-##
-dups <- dups_orig
-dups <- dups[dups$func_copy == 'conserv', ]
-dups <- dups[,c(2:7,10:13,30,31)]
-dups <- dups[!dups$dup_dnds==Inf,]
-dup_cor <- cor(dups)
-colnames(dup_cor) <- c('Exons','Length (bp)','Sequence Similarity','Dn','Ds','Dn/Ds','PPI','Tau','Tissues Expressed in','Expression Level','GC Content','Expression Divergence')
-rownames(dup_cor) <- c('Exons','Length (bp)','Sequence Similarity','Dn','Ds','Dn/Ds','PPI','Tau','Tissues Expressed in','Expression Level','GC Content','Expression Divergence')
-dup_cor <- dup_cor[, c('Exons','Length (bp)','GC Content','Sequence Similarity','Dn','Ds','Dn/Ds','PPI','Tau','Tissues Expressed in','Expression Level','Expression Divergence')]
-dup_cor <- dup_cor[c('Exons','Length (bp)','GC Content','Sequence Similarity','Dn','Ds','Dn/Ds','PPI','Tau','Tissues Expressed in','Expression Level','Expression Divergence'),]
-dup_pmat <- cor_pmat(dup_cor)
-
-pdf(file="./Input_Files/Conserved_Correlation_Matrix.pdf", height=10, width=10)
-corrplot(dup_cor, p.mat=dup_pmat, method="circle", type="lower",sig.level=c(0.0001,0.001,0.01, 0.05),
-         insig="label_sig", pch.col="white", tl.col="black",
-         diag=FALSE, pch.cex=1.6, col=colorRampPalette(c("darkred","white","darkgreen"))(200))
-dev.off()
-
-##
-dups <- dups_orig
-dups <- dups[dups$func_copy == 'neo_copy',]
-dups <- dups[,c(2:7,10:13,30,31)]
-dups <- dups[!dups$dup_dnds==Inf,]
-dup_cor <- cor(dups)
-colnames(dup_cor) <- c('Exons','Length (bp)','Sequence Similarity','Dn','Ds','Dn/Ds','PPI','Tau','Tissues Expressed in','Expression Level','GC Content','Expression Divergence')
-rownames(dup_cor) <- c('Exons','Length (bp)','Sequence Similarity','Dn','Ds','Dn/Ds','PPI','Tau','Tissues Expressed in','Expression Level','GC Content','Expression Divergence')
-dup_cor <- dup_cor[, c('Exons','Length (bp)','GC Content','Sequence Similarity','Dn','Ds','Dn/Ds','PPI','Tau','Tissues Expressed in','Expression Level','Expression Divergence')]
-dup_cor <- dup_cor[c('Exons','Length (bp)','GC Content','Sequence Similarity','Dn','Ds','Dn/Ds','PPI','Tau','Tissues Expressed in','Expression Level','Expression Divergence'),]
-dup_pmat <- cor_pmat(dup_cor)
-
-pdf(file="./Input_Files/NeoCopy_Correlation_Matrix.pdf", height=10, width=10)
-corrplot(dup_cor, p.mat=dup_pmat, method="circle", type="lower",sig.level=c(0.0001,0.001,0.01, 0.05),
-         insig="label_sig", pch.col="white", tl.col="black",
-         diag=FALSE, pch.cex=1.6, col=colorRampPalette(c("darkred","white","darkgreen"))(200))
-dev.off()
-
-##
-dups <- dups_orig
-dups <- dups[dups$func_copy == 'not_neo_copy',]
-dups <- dups[,c(2:7,10:13,30,31)]
-dups <- dups[!dups$dup_dnds==Inf,]
-dup_cor <- cor(dups)
-colnames(dup_cor) <- c('Exons','Length (bp)','Sequence Similarity','Dn','Ds','Dn/Ds','PPI','Tau','Tissues Expressed in','Expression Level','GC Content','Expression Divergence')
-rownames(dup_cor) <- c('Exons','Length (bp)','Sequence Similarity','Dn','Ds','Dn/Ds','PPI','Tau','Tissues Expressed in','Expression Level','GC Content','Expression Divergence')
-dup_cor <- dup_cor[, c('Exons','Length (bp)','GC Content','Sequence Similarity','Dn','Ds','Dn/Ds','PPI','Tau','Tissues Expressed in','Expression Level','Expression Divergence')]
-dup_cor <- dup_cor[c('Exons','Length (bp)','GC Content','Sequence Similarity','Dn','Ds','Dn/Ds','PPI','Tau','Tissues Expressed in','Expression Level','Expression Divergence'),]
-dup_pmat <- cor_pmat(dup_cor)
-
-pdf(file="./Input_Files/NotNeoCopy_Correlation_Matrix.pdf", height=10, width=10)
-corrplot(dup_cor, p.mat=dup_pmat, method="circle", type="lower",sig.level=c(0.0001,0.001,0.01, 0.05),
-         insig="label_sig", pch.col="white", tl.col="black",
-         diag=FALSE, pch.cex=1.6, col=colorRampPalette(c("darkred","white","darkgreen"))(200))
-dev.off()
-
-##
-dups <- dups_orig
-dups <- dups[dups$func_copy == 'specializ',]
-dups <- dups[,c(2:7,10:13,30,31)]
-dups <- dups[!dups$dup_dnds==Inf,]
-dup_cor <- cor(dups)
-colnames(dup_cor) <- c('Exons','Length (bp)','Sequence Similarity','Dn','Ds','Dn/Ds','PPI','Tau','Tissues Expressed in','Expression Level','GC Content','Expression Divergence')
-rownames(dup_cor) <- c('Exons','Length (bp)','Sequence Similarity','Dn','Ds','Dn/Ds','PPI','Tau','Tissues Expressed in','Expression Level','GC Content','Expression Divergence')
-dup_cor <- dup_cor[, c('Exons','Length (bp)','GC Content','Sequence Similarity','Dn','Ds','Dn/Ds','PPI','Tau','Tissues Expressed in','Expression Level','Expression Divergence')]
-dup_cor <- dup_cor[c('Exons','Length (bp)','GC Content','Sequence Similarity','Dn','Ds','Dn/Ds','PPI','Tau','Tissues Expressed in','Expression Level','Expression Divergence'),]
-dup_pmat <- cor_pmat(dup_cor)
-
-pdf(file="./Input_Files/Specializ_Correlation_Matrix.pdf", height=10, width=10)
-corrplot(dup_cor, p.mat=dup_pmat, method="circle", type="lower",sig.level=c(0.0001,0.001,0.01, 0.05),
-         insig="label_sig", pch.col="white", tl.col="black",
-         diag=FALSE, pch.cex=1.6, col=colorRampPalette(c("darkred","white","darkgreen"))(200))
-dev.off()
-
-
-
-
-#####################################################################################
-
-
-## repeat for orthologs
-#orthos <- orthos[,c(2:16)]
-
-# add expression divergence
-orthos <- read.csv("C:/Users/17735/Downloads/Duplicate_Pairs_Project/Final_Figures/Input_Files/Orthos_Master_File.tsv", sep="")
-
-
-#orthos <- orthos[,c(9,15)]
-
-ortho_1 <- orthos[,c(1,17,18)]
-ortho_2 <- ortho_1[ortho_1$ortho=='ortho_2',]
-ortho_1 <- ortho_1[ortho_1$ortho=='ortho_1',]
-
-ortho_1 <- ortho_1[1]
-ortho_2 <- ortho_2[1]
-
-colnames(ortho_1) <- 'gn'
-colnames(ortho_2) <- 'gn'
-
-# merge ortholicate copies with their expression data
-ortho_1 <- merge(ortho_1,exp,by='gn')
-ortho_2 <- merge(ortho_2,exp,by='gn')
-
-# calculate euclidean distances between copies 
-rownames(ortho_1) <- ortho_1$gn
-ortho_1 <- ortho_1[,-c(1)]
-
-rownames(ortho_2) <- ortho_2$gn
-ortho_2 <- ortho_2[,-c(1)]
-
-ortho_ed <- (rowSums((ortho_1 - ortho_2) ^ 2)) ^ (1/2)
-orthos$ed <- ortho_ed
-
-# merge back 
-#orthos_orig <- read.csv("C:/Users/17735/Downloads/Duplicate_Pairs_Project/Final_Figures/Input_Files/Orthos_Master_File.tsv", sep="")
-
-ortho1 <- orthos[,c(1,3)]
-orthos <- orthos[,c(2,3)]
-
-colnames(ortho1) <- c('ortho_gn','Expression Divergence')
-colnames(orthos) <- c('ortho_gn','Expression Divergence')
-
-orthos <- rbind(orthos,ortho1)
-
-orthos <- merge(orthos_orig,orthos,by='ortho_gn')
-##
 
 # make correlation matrix for orthologs
+ortho_corr_plot <- ortho_corr_plot[c('n_exons','prot_length','full_adaptive_model_Dn','full_adaptive_model_Ds','MG94xREV_omega','tau','value','gc_content','n_genes')]
+ortho_corr_plot <- ortho_corr_plot %>% mutate_all(~ as.numeric(.))
 
-library(ggcorrplot)
-orthos <- orthos[,c(2:11,20,21)]
-orthos <- orthos[!orthos$ortho_dnds==Inf,]
+ortho_corr_plot <- cor(ortho_corr_plot)
+colnames(ortho_corr_plot) <- c('Exon Amount','Length (bp)','Dn','Ds','Dn/Ds','Tau','Expression Level','GC Content','Genes in Orthogroup')
+rownames(ortho_corr_plot) <- colnames(ortho_corr_plot)
 
+ortho_pmat <- cor_pmat(ortho_corr_plot)
 
-
-ortho_cor <- cor(orthos)
-
-colnames(ortho_cor) <- c('Tau','Tissues Expressed in','Expression Level','Exons','Length (bp)','Sequence Similarity','Dn','Ds','Dn/Ds','PPI','GC Content','Expression Divergence')
-rownames(ortho_cor) <- c('Tau','Tissues Expressed in','Expression Level','Exons','Length (bp)','Sequence Similarity','Dn','Ds','Dn/Ds','PPI','GC Content','Expression Divergence')
-ortho_cor <- ortho_cor[, c('Exons','Length (bp)','GC Content','Sequence Similarity','Dn','Ds','Dn/Ds','PPI','Tau','Tissues Expressed in','Expression Level','Expression Divergence')]
-ortho_cor <- ortho_cor[c('Exons','Length (bp)','GC Content','Sequence Similarity','Dn','Ds','Dn/Ds','PPI','Tau','Tissues Expressed in','Expression Level','Expression Divergence'),]
-
-ortho_pmat <- cor_pmat(ortho_cor)
-
-
-library(grDevices)
-library(corrplot)
-pdf(file="./Input_Files/Ortho_Correlation_Matrix.pdf", height=10, width=10)
-corrplot(ortho_cor, p.mat=ortho_pmat, method="circle", type="lower",sig.level=c(0.0001,0.001,0.01, 0.05),
+pdf(file="./Plots/ortho_correlation_matrix.pdf", height=5, width=5)
+corrplot(ortho_corr_plot, p.mat=ortho_pmat, method="circle", type="lower",sig.level=c(0.0001,0.001,0.01, 0.05),
          insig="label_sig", pch.col="white", tl.col="black",
          diag=FALSE, pch.cex=1.6, col=colorRampPalette(c("darkred","white","darkgreen"))(200))
 dev.off()
 
 
 
+# phylogeny with ds histogram
+ds_tree <- dups_dnds[c('id','full_adaptive_model_Ds')]
+ds_tree <- merge(ds_tree,longest_transcript[c('YOgn','species')],by.x='id',by.y='YOgn')
 
-# n orthologs before pval analyses
-# N ORTHOLOGS AND DS AND FUNC 
+tree <- ape::read.tree('./MEGA_Tree.nwk')
 
+library(ggtree)
+ggplot(ds_tree, aes(x=full_adaptive_model_Ds,y=factor(species, levels=rev(c('dmel','dyak','dana','dpse','dper','dvir','dmoj','dwil'))))) +
+  geom_point() +
+  xlim(2,0) +
+  ylab('') +
+  xlab('Ds') +
+  theme_bw() +
+  theme(panel.border = element_blank()) +
+  ggtree(tree) + geom_tiplab(aes(label = label)) 
 
-
-
-
-
-
-
-
-
-
+ggsave(filename = './Plots/ds_phylogeny.jpg', width = 13, height = 5)
 
 
