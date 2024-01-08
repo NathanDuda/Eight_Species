@@ -15,6 +15,7 @@ tau <- read.csv("./Tau.tsv", sep="")
 
 dnds <- read.csv("./orthogroups_omega.tsv", sep="")
 
+longest_transcript <- read.csv("./longest_transcript.tsv", sep="")
 seqs <- read.csv("./longest_transcript.tsv", sep="")
 seqs <- seqs %>% mutate(gc_content = (str_count(longest_ORF, "G") + str_count(longest_ORF, "C")) / nchar(longest_ORF) * 100)
 
@@ -427,7 +428,7 @@ tree <- ape::read.tree('./MEGA_Tree.nwk')
 
 library(ggtree)
 ggplot(ds_tree, aes(x=full_adaptive_model_Ds,y=factor(species, levels=rev(c('dmel','dyak','dana','dpse','dper','dvir','dmoj','dwil'))))) +
-  geom_point() +
+  geom_jitter() +
   xlim(2,0) +
   ylab('') +
   xlab('Ds') +
