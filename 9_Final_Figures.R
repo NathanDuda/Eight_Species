@@ -244,6 +244,7 @@ ggplot(all_tau, aes(x=factor(category, levels = func_levels),y=tau))+
 
 ggsave(filename = './Plots/tau_boxplot.jpg', width = 7, height = 4)
 
+write.table(all_tau,'all_plotting_categories.tsv') # REMOVE IF PPI REMOVED OR MOVED INTO THIS SCRIPT
 
 # tissue expression heatmap 
 
@@ -362,6 +363,34 @@ ggplot(ratio, aes(x=ratio)) +
   xlim(0,10) +
   geom_vline(xintercept =1)
 
+ratio <- ratio[c('Orthogroup','ratio')]
+
+
+# ratio per tissue
+tissue_ratio <- dups_exp %>%
+  select(-dup_1, -dup_2, -ancestral_copy) 
+
+tissue_names <- c('f_ac','f_dg','f_go','f_hd','f_re','f_tx','f_wb',
+                  'm_ac','m_dg','m_go','m_hd','m_re','m_tx','m_wb')
+
+for (tissue in tissue_names) {
+  tissue_ratio <- tissue_ratio %>%
+    mutate(!!tissue := (select(., paste0('dup1_', !!tissue))   +
+                          select(., paste0('dup2_', !!tissue))  ) / 
+                          select(., paste0('anc_', !!tissue)) ) %>%
+    select(-paste0('dup1_', tissue),
+           -paste0('dup2_', tissue),
+           -paste0('anc_', tissue)) %>%
+    mutate_all(~unlist(.))
+}
+
+tissue_ratio <- tissue_ratio %>%
+  select(-Orthogroup) %>%
+  mutate_all(~ replace(., is.na(.), NA) %>% 
+               replace(., is.infinite(.), NA)) %>%
+  summarise_all(~ median(., na.rm = TRUE)) %>%
+  t()
+
 ###
 
 
@@ -377,18 +406,20 @@ corr_plot <- merge(corr_plot,tau,by.x='id', by.y='YOgnID')
 
 dup_corr_plot <- merge(corr_plot,all_dups,by='id')
 dup_corr_plot <- merge(dup_corr_plot,n_gene_per_orthogroup,by='Orthogroup')
+dup_corr_plot <- merge(dup_corr_plot,ratio, by = 'Orthogroup')
 
 ortho_corr_plot <- merge(corr_plot,all_ortho,by='id')
 ortho_corr_plot <- merge(ortho_corr_plot,n_gene_per_orthogroup,by='Orthogroup')
+ortho_corr_plot <- merge(ortho_corr_plot,ratio, by = 'Orthogroup')
 
 
 # make correlation matrix for duplicates
-dup_corr_plot <- dup_corr_plot[c('n_exons','prot_length','full_adaptive_model_Dn','full_adaptive_model_Ds','MG94xREV_omega','tau','value','gc_content','n_genes')]
+dup_corr_plot <- dup_corr_plot[c('n_exons','prot_length','full_adaptive_model_Dn','full_adaptive_model_Ds','MG94xREV_omega','tau','value','gc_content','n_genes','ratio')]
 dup_corr_plot <- dup_corr_plot %>% mutate_all(~ as.numeric(.))
 
 library(ggcorrplot)
 dup_corr_plot <- cor(dup_corr_plot)
-colnames(dup_corr_plot) <- c('Exon Amount','Length (bp)','Dn','Ds','Dn/Ds','Tau','Expression Level','GC Content','Genes in Orthogroup')
+colnames(dup_corr_plot) <- c('Exon Amount','Length (bp)','Dn','Ds','Dn/Ds','Tau','Expression Level','GC Content','Genes in Orthogroup','Expression Ratio')
 rownames(dup_corr_plot) <- colnames(dup_corr_plot)
 
 dup_pmat <- cor_pmat(dup_corr_plot)
@@ -403,11 +434,11 @@ dev.off()
 
 
 # make correlation matrix for orthologs
-ortho_corr_plot <- ortho_corr_plot[c('n_exons','prot_length','full_adaptive_model_Dn','full_adaptive_model_Ds','MG94xREV_omega','tau','value','gc_content','n_genes')]
+ortho_corr_plot <- ortho_corr_plot[c('n_exons','prot_length','full_adaptive_model_Dn','full_adaptive_model_Ds','MG94xREV_omega','tau','value','gc_content','n_genes','ratio')]
 ortho_corr_plot <- ortho_corr_plot %>% mutate_all(~ as.numeric(.))
 
 ortho_corr_plot <- cor(ortho_corr_plot)
-colnames(ortho_corr_plot) <- c('Exon Amount','Length (bp)','Dn','Ds','Dn/Ds','Tau','Expression Level','GC Content','Genes in Orthogroup')
+colnames(ortho_corr_plot) <- c('Exon Amount','Length (bp)','Dn','Ds','Dn/Ds','Tau','Expression Level','GC Content','Genes in Orthogroup','Expression Ratio')
 rownames(ortho_corr_plot) <- colnames(ortho_corr_plot)
 
 ortho_pmat <- cor_pmat(ortho_corr_plot)
@@ -437,5 +468,7 @@ ggplot(ds_tree, aes(x=full_adaptive_model_Ds,y=factor(species, levels=rev(c('dme
   ggtree(tree) + geom_tiplab(aes(label = label)) 
 
 ggsave(filename = './Plots/ds_phylogeny.jpg', width = 13, height = 5)
+
+
 
 
