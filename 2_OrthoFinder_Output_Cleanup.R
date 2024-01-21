@@ -141,3 +141,64 @@ tau <- tau[c('YOgnID','tau')]
 write.table(tau, file= 'Tau.tsv')
 
 
+
+
+
+
+
+
+
+
+
+# keep only expressed genes:
+# expression >1 to 0 
+exp <- read.csv("./Expression_Data.tsv", sep="")
+
+
+
+
+t <- longest_transcript[longest_transcript$YOgn %in% exp$YOgnID,]
+
+
+table(t$species)
+
+
+
+e <- exp %>%
+  mutate(species = case_when(grepl('AN',YOgnID) ~ 'dana',
+                             grepl('ME',YOgnID) ~ 'dmel',
+                             grepl('MO',YOgnID) ~ 'dmoj',
+                             grepl('PE',YOgnID) ~ 'dper',
+                             grepl('PS',YOgnID) ~ 'dpse',
+                             grepl('VI',YOgnID) ~ 'dvir',
+                             grepl('WI',YOgnID) ~ 'dwil',
+                             grepl('YA',YOgnID) ~ 'dyak'))
+
+
+e <- e %>%
+  mutate_all(~ ifelse(. < 1, 0, .)) %>%
+  filter(rowSums(select(., 2:15)) > 0)
+
+
+
+nonoverlapping_all_annotations <- t %>%
+  group_by(chrom, species) %>%
+  arrange(start) %>%
+  filter(case_when(
+    start >= lag(start) & start <= lag(end) ~ F,
+    start >= lead(start) & start <= lead(end) ~ F,
+    T ~ T)) %>%
+  arrange(end) %>%
+  filter(case_when(
+    end >= lag(start) & end <= lag(end) ~ F,
+    end >= lead(start) & end <= lead(end) ~ F,
+    T ~ T)) %>%
+  ungroup()
+
+
+
+
+
+
+
+

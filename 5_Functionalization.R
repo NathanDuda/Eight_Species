@@ -25,28 +25,28 @@ write.table(exp,'./Relative_Expression.tsv')
 
 # get exp for dups and ancestral
 dup_1_exp <- exp %>% rename_at(-1, ~paste('dup_1_', ., sep = ''))
-dup_anc_exp <- dups %>%  merge(dup_1_exp, ., by.x = 'YOgnID', by.y ='dup_1') %>% rename(YOgnID = 'dup_1')
+dup_anc_exp <- dups %>%  merge(dup_1_exp, ., by.x = 'YOgnID', by.y ='dup_1') %>% rename(dup_1 = 'YOgnID')
 
 dup_2_exp <- exp %>% rename_at(-1, ~paste('dup_2_', ., sep = ''))
-dup_anc_exp <- dup_anc_exp %>% merge(dup_2_exp, ., by.x = 'YOgnID', by.y ='dup_2') %>% rename(YOgnID = 'dup_2')
+dup_anc_exp <- dup_anc_exp %>% merge(dup_2_exp, ., by.x = 'YOgnID', by.y ='dup_2') %>% rename(dup_2 = 'YOgnID')
 
 anc_exp <- exp %>% rename_at(-1, ~paste('anc_', ., sep = ''))
-dup_anc_exp <- dup_anc_exp %>% merge(anc_exp, ., by.x = 'YOgnID', by.y ='ancestral_copy') %>% rename(YOgnID = 'anc')
+dup_anc_exp <- dup_anc_exp %>% merge(anc_exp, ., by.x = 'YOgnID', by.y ='ancestral_copy') %>% rename(anc = 'YOgnID')
 
 # get exp for ortholog pairs 
 ortho_x_exp <- exp %>% rename_at(-1, ~paste('ortho_x_', ., sep = ''))
-ortho_pair_exp <- ortho_pairs %>% merge(ortho_x_exp, ., by.x = 'YOgnID', by.y ='YOgn.x') %>% rename(YOgnID = 'ortho_x')
+ortho_pair_exp <- ortho_pairs %>% merge(ortho_x_exp, ., by.x = 'YOgnID', by.y ='YOgn.x') %>% rename(ortho_x = 'YOgnID')
 
 ortho_y_exp <- exp %>% rename_at(-1, ~paste('ortho_y_', ., sep = ''))
-ortho_pair_exp <- ortho_pair_exp %>% merge(ortho_y_exp, ., by.x = 'YOgnID', by.y ='YOgn.y') %>% rename(YOgnID = 'ortho_y') %>%
+ortho_pair_exp <- ortho_pair_exp %>% merge(ortho_y_exp, ., by.x = 'YOgnID', by.y ='YOgn.y') %>% rename(ortho_y = 'YOgnID') %>%
   select(-species.x, -species.y)
 
 # get combined expression values and after adding, calculate relative expression
 dup_1_exp <- raw_exp %>% rename_at(-1, ~paste('dup_1_', ., sep = ''))
-dups_combined_exp <- dups %>%  merge(dup_1_exp, ., by.x = 'YOgnID', by.y ='dup_1') %>% rename(YOgnID = 'dup_1')
+dups_combined_exp <- dups %>%  merge(dup_1_exp, ., by.x = 'YOgnID', by.y ='dup_1') %>% rename(dup_1 = 'YOgnID')
 
 dup_2_exp <- raw_exp %>% rename_at(-1, ~paste('dup_2_', ., sep = ''))
-dups_combined_exp <- dups_combined_exp %>% merge(dup_2_exp, ., by.x = 'YOgnID', by.y ='dup_2') %>% rename(YOgnID = 'dup_2')
+dups_combined_exp <- dups_combined_exp %>% merge(dup_2_exp, ., by.x = 'YOgnID', by.y ='dup_2') %>% rename(dup_2 = 'YOgnID')
 
 tissue_names <- c('f_ac','f_dg','f_go','f_hd','f_re','f_tx','f_wb',
                   'm_ac','m_dg','m_go','m_hd','m_re','m_tx','m_wb')
