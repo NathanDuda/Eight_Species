@@ -106,6 +106,12 @@ for (species in species_names){
   all_expression <- rbind(all_expression,expressed_genes)
 }
 
+# make expression values lower than 1 into 0 
+all_expression[all_expression < 1] <- 0 
+# re filter genes without any expression 
+all_expression <- all_expression %>%
+  filter(rowSums(select(., 2:15)) > 0)
+
 # write expressed genes to file
 write.table(all_expression,'Expression_Data.tsv')
 

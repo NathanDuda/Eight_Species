@@ -138,9 +138,27 @@ for (tissue in tissue_names) {
 }
 
 new_exp_neo <- na.omit(new_exp_neo[c('Orthogroup','func')])
+colnames(new_exp_neo) <- c('Orthogroup','new_exp_func')
 
-matching_rows <- match(func$Orthogroup, new_exp_neo$Orthogroup)
-func$func <- ifelse(!is.na(matching_rows), new_exp_neo$func[matching_rows], func$func)
+#matching_rows <- match(func$Orthogroup, new_exp_neo$Orthogroup)
+#func$func <- ifelse(!is.na(matching_rows), new_exp_neo$func[matching_rows], func$func)
+
+
+t <- func %>%
+  left_join(., new_exp_neo, by = 'Orthogroup') %>%
+  mutate(func = case_when(new_exp_func == 'specializ' ~ 'specializ',
+                          func == 'specializ' ~ 'specializ',
+                          func == 'neo_dup1' & new_exp_func == 'neo_dup2' ~ 'specializ',
+                          func == 'neo_dup2' & new_exp_func == 'neo_dup1' ~ 'specializ',
+                          
+                          
+                          (func == 'conserv' | func == 'subfun') & new_exp_func == 'neo_dup1' ~ 'neo_dup1',
+                          (func == 'conserv' | func == 'subfun') & new_exp_func == 'neo_dup2' ~ 'neo_dup2',
+                          (func == 'conserv' | func == 'subfun') & new_exp_func == 'specializ' ~ 'specializ'
+                          
+                          ))
+
+
 
 # write functionalization results to file
 write.table(func, file= 'Dup_Functionalizations.tsv')

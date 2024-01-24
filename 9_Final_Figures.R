@@ -264,7 +264,7 @@ all_tissue_exp <- all_tissue_exp %>%
 
 ggplot(all_tissue_exp, aes(x=factor(category,levels=func_levels), y=name, fill= value)) +
   geom_tile() +
-  scale_fill_gradient(high = "white", low = "dodgerblue4",guide = "colorbar") +
+  scale_fill_gradient(high = "dodgerblue4", low = "white",guide = "colorbar") +
   theme(legend.title = element_blank(),
         strip.text = element_blank(),
         axis.title.x = element_blank(), axis.title.y = element_blank(),
