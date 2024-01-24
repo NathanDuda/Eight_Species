@@ -25,28 +25,28 @@ write.table(exp,'./Relative_Expression.tsv')
 
 # get exp for dups and ancestral
 dup_1_exp <- exp %>% rename_at(-1, ~paste('dup_1_', ., sep = ''))
-dup_anc_exp <- dups %>%  merge(dup_1_exp, ., by.x = 'YOgnID', by.y ='dup_1') %>% rename(dup_1 = 'YOgnID')
+dup_anc_exp <- dups %>%  merge(dup_1_exp, ., by.x = 'YOgnID', by.y ='dup_1') %>% rename(YOgnID = 'dup_1')
 
 dup_2_exp <- exp %>% rename_at(-1, ~paste('dup_2_', ., sep = ''))
-dup_anc_exp <- dup_anc_exp %>% merge(dup_2_exp, ., by.x = 'YOgnID', by.y ='dup_2') %>% rename(dup_2 = 'YOgnID')
+dup_anc_exp <- dup_anc_exp %>% merge(dup_2_exp, ., by.x = 'YOgnID', by.y ='dup_2') %>% rename(YOgnID = 'dup_2')
 
 anc_exp <- exp %>% rename_at(-1, ~paste('anc_', ., sep = ''))
-dup_anc_exp <- dup_anc_exp %>% merge(anc_exp, ., by.x = 'YOgnID', by.y ='ancestral_copy') %>% rename(anc = 'YOgnID')
+dup_anc_exp <- dup_anc_exp %>% merge(anc_exp, ., by.x = 'YOgnID', by.y ='ancestral_copy') %>% rename(YOgnID = 'anc')
 
 # get exp for ortholog pairs 
 ortho_x_exp <- exp %>% rename_at(-1, ~paste('ortho_x_', ., sep = ''))
-ortho_pair_exp <- ortho_pairs %>% merge(ortho_x_exp, ., by.x = 'YOgnID', by.y ='YOgn.x') %>% rename(ortho_x = 'YOgnID')
+ortho_pair_exp <- ortho_pairs %>% merge(ortho_x_exp, ., by.x = 'YOgnID', by.y ='YOgn.x') %>% rename(YOgnID = 'ortho_x')
 
 ortho_y_exp <- exp %>% rename_at(-1, ~paste('ortho_y_', ., sep = ''))
-ortho_pair_exp <- ortho_pair_exp %>% merge(ortho_y_exp, ., by.x = 'YOgnID', by.y ='YOgn.y') %>% rename(ortho_y = 'YOgnID') %>%
+ortho_pair_exp <- ortho_pair_exp %>% merge(ortho_y_exp, ., by.x = 'YOgnID', by.y ='YOgn.y') %>% rename(YOgnID = 'ortho_y') %>%
   select(-species.x, -species.y)
 
 # get combined expression values and after adding, calculate relative expression
 dup_1_exp <- raw_exp %>% rename_at(-1, ~paste('dup_1_', ., sep = ''))
-dups_combined_exp <- dups %>%  merge(dup_1_exp, ., by.x = 'YOgnID', by.y ='dup_1') %>% rename(dup_1 = 'YOgnID')
+dups_combined_exp <- dups %>%  merge(dup_1_exp, ., by.x = 'YOgnID', by.y ='dup_1') %>% rename(YOgnID = 'dup_1')
 
 dup_2_exp <- raw_exp %>% rename_at(-1, ~paste('dup_2_', ., sep = ''))
-dups_combined_exp <- dups_combined_exp %>% merge(dup_2_exp, ., by.x = 'YOgnID', by.y ='dup_2') %>% rename(dup_2 = 'YOgnID')
+dups_combined_exp <- dups_combined_exp %>% merge(dup_2_exp, ., by.x = 'YOgnID', by.y ='dup_2') %>% rename(YOgnID = 'dup_2')
 
 tissue_names <- c('f_ac','f_dg','f_go','f_hd','f_re','f_tx','f_wb',
                   'm_ac','m_dg','m_go','m_hd','m_re','m_tx','m_wb')
@@ -87,23 +87,69 @@ sc_ed_values <- ortho_pair_exp %>%
 # calculate the cutoff ed value 
 iqr <- IQR(sc_ed_values$sc_ed) / 2
 cutoff <- median(sc_ed_values$sc_ed) + iqr
-#cutoff <- cutoff /2
 
 
 # use euclidean distance values to classify into functional groups 
+
+strength_coefficient <- 2
+
 func <- ed_values %>%
   rowwise() %>%
   mutate(func = case_when((dup1_a <= cutoff) & (dup2_a <= cutoff) ~ 'conserv',
                           (dup1_a > cutoff) & (dup2_a <= cutoff) ~ 'neo_dup1',
                           (dup1_a <= cutoff & dup2_a > cutoff) ~ 'neo_dup2',
                           (dup1_a > cutoff & dup2_a > cutoff & d1d2_a <= cutoff) ~ 'subfun',
-                          (dup1_a > cutoff & dup2_a > cutoff & d1d2_a > cutoff) ~ 'specializ'))
+                          (dup1_a > cutoff & dup2_a > cutoff & d1d2_a > cutoff) ~ 'specializ')) %>%
+  mutate(func_conservative = 
+                case_when((dup1_a <= cutoff*strength_coefficient) & (dup2_a <= cutoff*strength_coefficient) ~ 'conserv',
+                          (dup1_a > cutoff*strength_coefficient) & (dup2_a <= cutoff*strength_coefficient) ~ 'neo_dup1',
+                          (dup1_a <= cutoff*strength_coefficient & dup2_a > cutoff*strength_coefficient) ~ 'neo_dup2',
+                          (dup1_a > cutoff*strength_coefficient & dup2_a > cutoff*strength_coefficient & d1d2_a <= cutoff*strength_coefficient) ~ 'subfun',
+                          (dup1_a > cutoff*strength_coefficient & dup2_a > cutoff*strength_coefficient & d1d2_a > cutoff*strength_coefficient) ~ 'specializ')) %>%
+  mutate(func_strength =
+           case_when(
+             func == 'neo_dup1' & func_conservative == 'neo_dup1' ~ 'strong_neo_dup1',
+             func == 'neo_dup2' & func_conservative == 'neo_dup2' ~ 'strong_neo_dup2',
+             func == 'specializ' & func_conservative == 'specializ' ~ 'strong_specializ',
+             func == 'subfun' & func_conservative == 'subfun' ~ 'strong_subfun',
+             func == 'conserv' & func_conservative == 'conserv' ~ 'strong_conserv',
+           
+             func == 'neo_dup1' & func_conservative != 'neo_dup1' ~ 'weak_neo_dup1',
+             func == 'neo_dup2' & func_conservative != 'neo_dup2' ~ 'weak_neo_dup2',
+             func == 'specializ' & func_conservative != 'specializ' ~ 'weak_specializ',
+             func == 'subfun' & func_conservative != 'subfun' ~ 'weak_subfun',
+             func == 'conserv' & func_conservative != 'conserv' ~ 'weak_conserv'))
 
 # add dup and anc gene ids to func 
 func <- merge(dups,func,by='Orthogroup')
+
+# classify duplicates as having gained a new function if they have expression in a tissue that the ancestral copy was not expressed in
+new_exp_neo <- dup_anc_exp
+new_exp_neo$func <- NA
+
+for (tissue in tissue_names) {
+  new_exp_neo <- new_exp_neo %>%
+    mutate(func = case_when(
+      select(., paste0('dup_2_',tissue)) != 0 & select(., paste0('dup_1_',tissue)) != 0 & 
+        select(., paste0('anc_',tissue)) == 0 ~ 'specializ',
+      select(., paste0('dup_1_',tissue)) != 0 & select(., paste0('anc_',tissue)) == 0 ~ 'neo_dup1',
+      select(., paste0('dup_2_',tissue)) != 0 & select(., paste0('anc_',tissue)) == 0 ~ 'neo_dup2',
+      T ~ func))
+}
+
+new_exp_neo <- na.omit(new_exp_neo[c('Orthogroup','func')])
+
+matching_rows <- match(func$Orthogroup, new_exp_neo$Orthogroup)
+func$func <- ifelse(!is.na(matching_rows), new_exp_neo$func[matching_rows], func$func)
 
 # write functionalization results to file
 write.table(func, file= 'Dup_Functionalizations.tsv')
 
 
+
+
+ggplot(func) +
+  #geom_point(aes(x=dup1_a, y=dup2_a, color = func)) +
+  geom_point(aes(x=dup1_a, y=dup2_a, color = func_strength)) +
+  theme_bw()
 

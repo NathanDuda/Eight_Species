@@ -58,7 +58,20 @@ dup_exons <- dup_exons %>%
                           dup_2_n_exons > 1 & dup_1_n_exons == 1 ~ 'RNA_dup_1',
                           dup_1_n_exons > 1 & dup_2_n_exons > 1 ~ 'DNA',
                           dup_2_n_exons > 1 & dup_1_n_exons > 1 ~ 'DNA',
-                          dup_2_n_exons == 1 & dup_1_n_exons == 1 ~ 'unknown'))
+                          dup_2_n_exons == 1 & dup_1_n_exons == 1 ~ 'unknown')) %>%
+  mutate(mech_anc_more_than_one = 
+                case_when(dup_1_n_exons > 1 & dup_2_n_exons == 1 & ancestral_copy_n_exons > 1 ~ 'RNA_dup_2',
+                          dup_2_n_exons > 1 & dup_1_n_exons == 1 & ancestral_copy_n_exons > 1 ~ 'RNA_dup_1',
+                          dup_1_n_exons > 1 & dup_2_n_exons > 1 & ancestral_copy_n_exons > 1 ~ 'DNA',
+                          dup_2_n_exons > 1 & dup_1_n_exons > 1 & ancestral_copy_n_exons > 1 ~ 'DNA',
+                          dup_2_n_exons == 1 & dup_1_n_exons == 1 ~ 'unknown',
+                          ancestral_copy_n_exons == 1 ~ 'unknown')) %>%
+  mutate(mech_anc_same_as_parental = 
+           case_when(dup_1_n_exons > 1 & dup_2_n_exons == 1 & ancestral_copy_n_exons == dup_1_n_exons ~ 'RNA_dup_2',
+                     dup_2_n_exons > 1 & dup_1_n_exons == 1 & ancestral_copy_n_exons == dup_2_n_exons ~ 'RNA_dup_1',
+                     dup_1_n_exons == dup_2_n_exons & dup_2_n_exons == ancestral_copy_n_exons & ancestral_copy_n_exons > 1 ~ 'DNA',
+                     T ~ 'unknown'))
+
 
 # write the duplication mechanisms of each duplicate pair to file
 write.table(dup_exons,file= 'Dup_Mechanism.tsv')
