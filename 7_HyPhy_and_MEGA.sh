@@ -23,25 +23,16 @@ for file in ./OrthoFinder_Output/Results_Jan01/Gene_Trees/*; do
 done
 
 
-# run hyphy busted on orthogroups (with at least 4 sequences bc then tree was made for it)
-
-max_parallel=5
-current_jobs=0
-
-for orthogroup_file in ./Grouped_Fastas/One_to_Two_Orthogroups/Codon_Alignments/*; do
+# run hyphy absrel on orthogroups (with at least 4 sequences bc then tree was made for it)
+for orthogroup_file in ./One_to_Two_Orthogroups/Codon_Alignments/*; do
  if [[ $(grep -c '>' "$orthogroup_file") -ge 4 ]]; then
   filename=$(basename "$orthogroup_file")
   filename="${filename%.*}"
-  hyphy busted --alignment "./Grouped_Fastas/One_to_Two_Orthogroups/Codon_Alignments/${filename}.fa" --tree "./OrthoFinder_Output/Results_Jan01/Gene_Trees/${filename}_tree.txt" --output "./Evolutionary_Rate/HyPhy_busted_Orthogroup_Output/${filename}.txt" &
- 
-  ((current_jobs++))
-  if ((current_jobs >= max_parallel)); then
-    wait
-    current_jobs=0
-  fi
- fi 
+  /home/tun37257/workdir/Eight_Species/HyPhy_Download/hyphy/HYPHYMPI absrel --alignment "./One_to_Two_Orthogroups/Codon_Alignments/${filename}.fa" --tree "./Gene_Trees/${filename}_tree.txt" --output "./HyPhy_absrel_Orthogroup_Output/${filename}.txt" &
+ fi
 done
 wait
+
 
 
 
@@ -63,7 +54,8 @@ done
 
 
 # get list of all files to run MEGA on 
-rename 's/\.fa$/\.meg/' ./Grouped_Fastas/One_to_One_Orthogroups/Codon_Alignments/*.fa
+cp ./Grouped_Fastas/One_to_One_Orthogroups/Codon_Alignments/* ./Grouped_Fastas/One_to_One_Orthogroups/MEGA_Codon_Alignments/*
+rename 's/\.fa$/\.meg/' ./Grouped_Fastas/One_to_One_Orthogroups/MEGA_Codon_Alignments/*.fa
 
 for file in ./Grouped_Fastas/One_to_One_Orthogroups/Codon_Alignments/*.meg; do
   echo -e "#MEGA\nTITLE" | cat - "$file" > temp && mv temp "$file"
@@ -103,5 +95,33 @@ sed -E 's/(YOgn[A-Z][A-Z])[0-9]+,/\1:/g' ./MEGA_Phylogeny/MEGA_Newicks_temp.txt 
 
 
 #rm ./MEGA_Phylogeny/MEGA_consensus_Newicks_temp.txt
+
+
+
+###
+
+
+# Hyphy BUSTED on one to two orthogroups
+for orthogroup_file in ./One_to_Two_Orthogroups/Codon_Alignments/*; do
+ if [[ $(grep -c '>' "$orthogroup_file") -ge 4 ]]; then
+  filename=$(basename "$orthogroup_file")
+  filename="${filename%.*}"
+  /home/tun37257/workdir/Eight_Species/HyPhy_Download/hyphy/HYPHYMPI busted --alignment "./One_to_Two_Orthogroups/Codon_Alignments/${filename}.fa" --tree "./Gene_Trees/${filename}_tree.txt" --output "./BUSTED_One_to_Two_Output/${filename}.txt" &
+ fi
+done
+
+# Hyphy BUSTED on one to one orthogroups
+for orthogroup_file in ./One_to_One_Orthogroups/Codon_Alignments/*; do
+ filename=$(basename "$orthogroup_file")
+ filename="${filename%.*}"
+ /home/tun37257/workdir/Eight_Species/HyPhy_Download/hyphy/HYPHYMPI busted --alignment "./One_to_One_Orthogroups/Codon_Alignments/${filename}.fa" --tree "./Gene_Trees/${filename}_tree.txt" --output "./BUSTED_One_to_One_Output/${filename}.txt" &
+done
+wait
+
+
+
+
+
+
 
 

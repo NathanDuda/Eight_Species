@@ -144,7 +144,7 @@ colnames(new_exp_neo) <- c('Orthogroup','new_exp_func')
 #func$func <- ifelse(!is.na(matching_rows), new_exp_neo$func[matching_rows], func$func)
 
 
-t <- func %>%
+func <- func %>%
   left_join(., new_exp_neo, by = 'Orthogroup') %>%
   mutate(func = case_when(new_exp_func == 'specializ' ~ 'specializ',
                           func == 'specializ' ~ 'specializ',
@@ -154,7 +154,8 @@ t <- func %>%
                           
                           (func == 'conserv' | func == 'subfun') & new_exp_func == 'neo_dup1' ~ 'neo_dup1',
                           (func == 'conserv' | func == 'subfun') & new_exp_func == 'neo_dup2' ~ 'neo_dup2',
-                          (func == 'conserv' | func == 'subfun') & new_exp_func == 'specializ' ~ 'specializ'
+                          (func == 'conserv' | func == 'subfun') & new_exp_func == 'specializ' ~ 'specializ',
+                          !is.na(func) ~ func
                           
                           ))
 
