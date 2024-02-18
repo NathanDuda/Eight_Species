@@ -167,7 +167,9 @@ all_dnds <- rbind(all_dups,all_ortho,all_func,all_mech)
 func_levels <- c('All_Ortho','All_Dup','DNA','RNA(new)','RNA(anc)','Cons','Neo(new)','Neo(anc)','Spec','Sub')
 
 
-dnds_plot <- ggplot(all_dnds, aes(x=factor(category, levels = func_levels),y=MG94xREV_omega))+ 
+dnds_plot <- all_dnds %>%
+  filter(category %in% func_levels) %>%
+  ggplot(., aes(x=factor(category, levels = func_levels),y=MG94xREV_omega))+ 
   # facet_grid(cols=vars(variable)) +
   ylab('Dn / Ds') +
   geom_boxplot(color=c('#778899','#D4E056','#F67280',"#E9AB17","#E9AB17","#3B7BBD",'#E23F51','#E23F51','#6CBC4D','#F18244')) + 
@@ -182,6 +184,8 @@ dnds_plot <- ggplot(all_dnds, aes(x=factor(category, levels = func_levels),y=MG9
                      ref.group = 'All_Ortho',hide.ns = TRUE, size=5) +
   geom_hline(yintercept=median((all_dnds[all_dnds$category=='All_Ortho',])['MG94xREV_omega']$MG94xREV_omega),
              linetype="dashed", color = '#778899',linewidth=0.5) 
+
+ggsave(dnds_plot, filename = './Plots/dnds_boxplot.jpg', width = 7, height = 4)
 
 
 dn_plot <- ggplot(all_dnds, aes(x=factor(category, levels = func_levels),y=full_adaptive_model_Dn))+ 
@@ -264,7 +268,7 @@ all_tissue_exp <- all_tissue_exp %>%
 
 ggplot(all_tissue_exp, aes(x=factor(category,levels=func_levels), y=name, fill= value)) +
   geom_tile() +
-  scale_fill_gradient(high = "dodgerblue4", low = "white",guide = "colorbar") +
+  scale_fill_gradient(high = "dodgerblue4", low = "#9AC0FF",guide = "colorbar") +
   theme(legend.title = element_blank(),
         strip.text = element_blank(),
         axis.title.x = element_blank(), axis.title.y = element_blank(),
@@ -470,5 +474,98 @@ ggplot(ds_tree, aes(x=full_adaptive_model_Ds,y=factor(species, levels=rev(c('dme
 ggsave(filename = './Plots/ds_phylogeny.jpg', width = 13, height = 5)
 
 
+# 
+tree <- ape::read.tree('./MEGA_Tree.nwk')
+
+library(ggtree)
+
+
+node_data <- data.frame(
+  node = tree['tip.label'],
+  category1 = sample(1:3, length(tree['tip.label']), replace = TRUE),
+  category2 = sample(1:3, length(tree['tip.label']), replace = TRUE)
+)
+
+
+
+func_counts <- all_func %>%
+  mutate(spec = case_when(str_detect(id, "AN") ~ 'dana',
+                          str_detect(id, "ME") ~ 'dmel',
+                          str_detect(id, "MO") ~ 'dmoj',
+                          str_detect(id, "PE") ~ 'dper',
+                          str_detect(id, "PS") ~ 'dpse',
+                          str_detect(id, "VI") ~ 'dvir',
+                          str_detect(id, "WI") ~ 'dwil',
+                          str_detect(id, "YA")~ 'dyak')) %>%
+  select(spec,func) %>%
+  mutate(func = gsub('_dup1', '', func),
+         func = gsub('_dup2', '', func))
+
+func_counts <- as.data.frame(table(func_counts$spec, func_counts$func))
+colnames(func_counts) <- c('spec','category','Freq')
+
+# mech per species
+
+all_mech <- dups_dnds %>%
+  filter(!is.na(mech) & dup_or_ortho=='dup')
+
+mech_counts <- all_mech %>%
+  mutate(spec = case_when(str_detect(id, "AN") ~ 'dana',
+                          str_detect(id, "ME") ~ 'dmel',
+                          str_detect(id, "MO") ~ 'dmoj',
+                          str_detect(id, "PE") ~ 'dper',
+                          str_detect(id, "PS") ~ 'dpse',
+                          str_detect(id, "VI") ~ 'dvir',
+                          str_detect(id, "WI") ~ 'dwil',
+                          str_detect(id, "YA")~ 'dyak')) %>%
+  select(spec,mech) %>%
+  mutate(mech = gsub('_dup_1', '', mech),
+         mech = gsub('_dup_2', '', mech))
+
+mech_counts <- as.data.frame(table(mech_counts$spec, mech_counts$mech))
+colnames(mech_counts) <- c('spec','category','Freq')
+
+
+
+
+# plots 
+ggtree_obj <- ggtree(tree) + geom_tiplab() 
+
+
+func_levels <- c(rep('conserved',8),rep('neofunctionalized',8),rep('specialized',8),rep('subfunctionalized',8))
+
+
+func_bars <- ggplot(data = func_counts, aes(x = "", y = Freq, fill = category)) +
+  geom_bar(width = 1, stat = "identity", position = 'fill') +
+  geom_text(data = subset(func_counts, Freq != 0), aes(label = Freq), position = position_fill(vjust = 0.5), colour = 'black', size = 3) +  
+  facet_grid(factor(spec, levels = c('dmel','dyak','dana','dpse','dper','dvir','dmoj','dwil')) ~ .) + 
+  theme_void() +
+  labs(title = '  Function') +
+  scale_fill_manual(values = rev(c('#778899','#C05780','#E9AB17',"#6CBC4D")),
+                    breaks = c('subfunctionalized','specialized','neofunctionalized','conserved')) +
+  theme(legend.position = "bottom", legend.title = element_blank(), strip.text = element_blank()) +
+  coord_flip()
+
+
+mech_pies <- ggplot(data=mech_counts, aes(x="", y=Freq, group=category, fill=category)) +
+  geom_bar(width = 1, stat = "identity", position = position_fill()) +
+  geom_text(aes(label = Freq), position = position_fill(vjust = 0.5), colour = 'black', size = 3) +
+  coord_polar("y", start=0) + 
+  facet_grid(factor(spec, levels= c('dmel','dyak','dana','dpse','dper','dvir','dmoj','dwil'))~.) + 
+  theme_void() +
+  scale_fill_manual(values=c("#0079C2", "#FF828B", "808080")) + ###
+  labs(title = 'Mechanism') +
+  theme(legend.position = 'bottom', legend.title = element_blank(), strip.text = element_blank())
+
+mech_func_phylogeny <- ggarrange(ggtree_obj, mech_pies, func_bars, 
+                                 nrow = 1, ncol = 3, 
+                                 widths = c(2, 0.39, 0.9),
+                                 heights = c(1,1,1))
+
+ggsave(mech_func_phylogeny, filename = './Plots/mech_func_phylogeny.jpg', width = 18, height = 7)
+
+
+ggtree_obj2 <- ggtree_obj + xlim(0,0.9)
+ggsave(ggtree_obj2, filename = './Plots/tall_mega_phylogeny.jpg',width = 4, height = 7)
 
 
