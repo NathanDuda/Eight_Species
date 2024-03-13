@@ -147,3 +147,33 @@ tau <- tau[c('YOgnID','tau')]
 # write tau to file
 write.table(tau, file= 'Tau.tsv')
 
+
+
+# sex bias 
+
+library(DESeq2)
+
+exp_deseq <- all_expression 
+
+col_data <- data.frame(sex = as.factor(c(rep("female", 7), rep("male", 7))))
+rownames(col_data) <- colnames(exp_deseq)
+
+
+exp_deseq <- round(exp_deseq, digits = 0)
+
+dds <- DESeqDataSetFromMatrix(countData = exp_deseq, colData = col_data, design = ~ sex)
+dds <- DESeq(dds)
+res <- results(dds)
+
+male_biased <- rownames(res)[which(res$padj < 0.05 & res$log2FoldChange > 0)]
+female_biased <- rownames(res)[which(res$padj < 0.05 & res$log2FoldChange < 0)]
+
+exp_deseq$bias <- "neutral"
+exp_deseq$bias[rownames(exp_deseq) %in% male_biased] <- "male_biased"
+exp_deseq$bias[rownames(exp_deseq) %in% female_biased] <- "female_biased"
+
+sex_bias <- exp_deseq %>%
+  mutate(YOgnID = rownames(.)) %>%
+  select(YOgnID, bias)
+
+write.table(sex_bias, file = './sex_bias.tsv')

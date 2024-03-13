@@ -157,9 +157,39 @@ func <- func %>%
                           (func == 'conserv' | func == 'subfun') & new_exp_func == 'specializ' ~ 'specializ',
                           !is.na(func) ~ func
                           
-                          ))
+                        ))
+
+### new tissue func counts
+how_often_neo_is_newtissue <- func %>%
+  mutate(new_tissue = case_when(
+                          #func == 'specializ' ~ 'specializ',
+                          func == 'specializ' & new_exp_func == 'neo_dup1' ~ 'specializ_newtissue_onedup',
+                          func == 'specializ' & new_exp_func == 'neo_dup2' ~ 'specializ_newtissue_onedup',
+                          
+                          new_exp_func == 'specializ' ~ 'newtissue_specializ',
+                          new_exp_func == 'neo_dup1' & new_exp_func == 'neo_dup2' ~ 'newtissue_specializ',
+                          
+                          #func == 'neo_dup1' ~ 'neo_dup1',
+                          #func == 'neo_dup1' ~ 'neo_dup2',
+                          func == 'neo_dup2' & new_exp_func == 'neo_dup2' ~ 'newtissue_neo',
+                          func == 'neo_dup1' & new_exp_func == 'neo_dup1' ~ 'newtissue_neo'
+  ))
+
+new_counts <- as.data.frame((table(how_often_neo_is_newtissue$new_tissue))) %>% 
+  pivot_wider(names_from='Var1',values_from='Freq')
+
+func_counts <- as.data.frame(table(how_often_neo_is_newtissue$func)) %>% 
+  pivot_wider(names_from='Var1',values_from='Freq')
+
+new_counts$newtissue_specializ / func_counts$specializ # % specialized dups with new tissue expressed in both dups
+new_counts$specializ_newtissue_onedup / func_counts$specializ # % specialized dups with new tissue expressed in one dup
+
+new_counts$newtissue_neo / (func_counts$neo_dup1 + func_counts$neo_dup2) # % neo dups with new tissue expressed
 
 
+
+
+###
 
 # write functionalization results to file
 write.table(func, file= 'Dup_Functionalizations.tsv')

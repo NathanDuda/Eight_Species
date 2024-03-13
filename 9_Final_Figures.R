@@ -25,12 +25,13 @@ mech <- read.csv("./Dup_Mechanism.tsv", sep="")
 mech <- mech[c('Orthogroup','mech')]
 
 func <- read.csv("./Dup_Functionalizations.tsv", sep="")
+orig_func <- func
+
 func <- func[c('Orthogroup','func')]
 func$func <- gsub('conserv','conserved',func$func)
 func$func <- gsub('specializ','specialized',func$func)
 func$func <- gsub('subfun','subfunctionalized',func$func)
 func$func <- gsub('neo','neofunctionalized',func$func)
-
 
 # per orthogroup figures:
 
@@ -569,3 +570,65 @@ ggtree_obj2 <- ggtree_obj + xlim(0,0.9)
 ggsave(ggtree_obj2, filename = './Plots/tall_mega_phylogeny.jpg',width = 4, height = 7)
 
 
+# sex bias
+sex_bias <- read.csv("./sex_bias.tsv", sep="")
+
+orig_func <- orig_func %>%
+  select(dup_1, dup_2, func)
+
+colnames(sex_bias) <- c('dup_1','dup_1_sex_bias')
+sex_bias_dups <- merge(orig_func, sex_bias, by = 'dup_1')
+
+colnames(sex_bias) <- c('dup_2','dup_2_sex_bias')
+sex_bias_dups <- merge(sex_bias_dups, sex_bias, by = 'dup_2')
+
+
+t <- as.data.frame(table(sex_bias_dups$func, sex_bias_dups$dup_1_sex_bias, sex_bias_dups$dup_2_sex_bias))
+
+
+colnames(t) <- c('func','dup1_bias','dup2_bias','freq')
+
+
+
+
+t <- sex_bias_dups %>%
+  mutate(bias = case_when(
+    dup_1_sex_bias == 'female_biased' & dup_2_sex_bias == 'female_biased' ~ 'both_fem',
+    dup_1_sex_bias == 'male_biased' & dup_2_sex_bias == 'male_biased' ~ 'both_male',
+    dup_1_sex_bias == 'neutral' & dup_2_sex_bias == 'neutral' ~ 'both_neut',
+    
+    dup_1_sex_bias == 'female_biased' & dup_2_sex_bias == 'male_biased' ~ 'switched_bias',
+    dup_1_sex_bias == 'male_biased' & dup_2_sex_bias == 'female_biased' ~ 'switched_bias',
+
+    dup_1_sex_bias == 'male_biased' & dup_2_sex_bias == 'neutral' ~ 'one_male',
+    dup_1_sex_bias == 'neutral' & dup_2_sex_bias == 'male_biased' ~ 'one_male',
+    
+    dup_1_sex_bias == 'female_biased' & dup_2_sex_bias == 'neutral' ~ 'one_fem',
+    dup_1_sex_bias == 'neutral' & dup_2_sex_bias == 'female_biased' ~ 'one_fem'
+    
+  ),
+  
+  sex_bias = case_when(
+    bias == 'one_male' & func == 'neo_dup1' & dup_1_sex_bias == 'male_biased' ~ 'neo_new_M',
+    bias == 'one_male' & func == 'neo_dup2' & dup_2_sex_bias == 'male_biased' ~ 'neo_new_M',
+    
+    bias == 'one_fem' & func == 'neo_dup1' & dup_1_sex_bias == 'female_biased' ~ 'neo_new_F',
+    bias == 'one_fem' & func == 'neo_dup2' & dup_2_sex_bias == 'female_biased' ~ 'neo_new_F',
+    
+    
+    bias == 'switched_bias' & func == 'neo_dup1' & dup_1_sex_bias == 'male_biased' ~ 'neo_switch_to_M_fromF',
+    bias == 'switched_bias' & func == 'neo_dup2' & dup_2_sex_bias == 'male_biased' ~ 'neo_switch_to_M_fromF',
+    bias == 'switched_bias' & func == 'neo_dup1' & dup_1_sex_bias == 'female_biased' ~ 'neo_switch_to_F_fromM',
+    bias == 'switched_bias' & func == 'neo_dup2' & dup_2_sex_bias == 'female_biased' ~ 'neo_switch_to_F_fromM',
+    bias == 'switched_bias' & func == 'specialized' ~ 'spec_switch_bias',
+    T ~ bias)
+  )
+
+t <- t %>% mutate(func = gsub('neo_dup1','neo',func),
+                  func = gsub('neo_dup2','neo',func))
+table(t$sex_bias, t$func)
+
+
+
+func <- read.csv("./Dup_Functionalizations.tsv", sep="")
+orig_func <- func
