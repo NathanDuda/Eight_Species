@@ -6,6 +6,13 @@ source('./startup.R')
 source("./CLOUD/CLOUD.r")
 
 
+
+
+library(tensorflow)
+library(keras) 
+library(mvtnorm)
+
+
 orthogroups <- read.delim2("./OrthoFinder_Output/Results_Jan01/Orthogroups/Orthogroups.tsv", na.strings = '')
 
 og_with_tree <- orthogroups %>%
@@ -44,8 +51,8 @@ dups_anc <- dups_anc %>%
 
 
 
-dups_anc$tpc <- NA
-dups_anc$tpca <- NA
+dups_anc$TPC <- NA
+dups_anc$TPCA <- NA
 
 p = 0
 for(i in 1:nrow(dups_anc)) {
@@ -68,8 +75,8 @@ for(i in 1:nrow(dups_anc)) {
   tpc <- cophenetic(tree)[dup1, dup2]
   tpca <- cophenetic(tree)[longer_dup, anc]
   
-  dups_anc$tpc[i] <- tpc
-  dups_anc$tpca[i] <- tpca
+  dups_anc$TPC[i] <- tpc
+  dups_anc$TPCA[i] <- tpca
   
   if(tpc > tpca) {p = p+1}
   
@@ -109,7 +116,7 @@ for (pair in unique(dups_anc$species_pair)) {
   
   dup_input <- dups_anc %>%
     filter(species_pair == pair) %>%
-    select(dup_1,tpc,tpca,dup_2,ancestral_copy)
+    select(dup_1,TPC,TPCA,dup_2,ancestral_copy)
   
   # merge sc with expression data
   exp <- orig_exp
@@ -138,26 +145,57 @@ for (pair in unique(dups_anc$species_pair)) {
   
   dup_input <- dup_input %>%
     select(-dup_1, -dup_2, -ancestral_copy) %>%
-    select(tpc, tpca, everything())
+    select(TPC, TPCA, everything())
   
   write.table(dup_input, './CLOUD/dup_cloud_input.tsv')
   
   
   GenerateTrainingData(m = 14, 
-                       Nk,  # the number of training observations for each of the five classes
-                       singlecopy_filename = '.CLOUD/sc_cloud_input.tsv', 
-                       duplicate_filename = '.CLOUD/dup_cloud_input.tsv', 
-                       training_prefix = './CLOUD/GenerateTrainingData_output.tsv')
+                       Nk = 50,  # change to 50000
+                       singlecopy_filename = './CLOUD/sc_cloud_input.tsv', 
+                       duplicate_filename = './CLOUD/dup_cloud_input.tsv', 
+                       training_prefix = './CLOUD/First_Try_training')
   
   
-  trained_classifier <- ClassifierCV()
+  ClassifierCV(m = 14, 
+               batchsize = 50, # change to 50000
+               num_epochs = 50, # change to 500
+               log_lambda_min = -5, 
+               log_lambda_max = -1, 
+               num_lambda = 5, 
+               gamma_min = 0, 
+               gamma_max = 1, 
+               num_gamma = 3, 
+               training_prefix = './CLOUD/First_Try_training')
   
-  GenerateFeatures(m = 14,
-                   singlecopy_filename = './CLOUD/sc_cloud_input.tsv',
-                   input_filename = './CLOUD/dup_cloud_input.tsv',
-                   feature_filename = './CLOUD/GenerateFeatures_output.tsv')
   
-  CLOUDClassify(trained_classifier, './CLOUD/GenerateFeatures_output.tsv')
+  PredictorCV(7, 50, 50, -5, -1, 5, 0, 1, 3, './CLOUD/First_Try_training')
+  
+  
+  
+  colnames(dup_input) <- c('tPC','tPCA',
+                           'eP1','eP2','eP3','eP4','eP5','eP6','eP7','eP8','eP9','eP10','eP11','eP12','ep13','eP14',
+                           'eC1','eC2','eC3','eC4','eC5','eC6','eC7','eC8','eC9','eC10','eC11','eC12','eC13','eC14',
+                           'eA1','eA2','eA3','eA4','eA5','eA6','eA7','eA8','eA9','eA10','eA11','eA12','eA13','eA14')
+  write.table(dup_input, './CLOUD/dup_cloud_input.tsv')
+  
+  
+  #GenerateFeatures(m = 14,
+  #                 singlecopy_filename = './CLOUD/sc_cloud_input.tsv',
+  #                 input_filename = './CLOUD/dup_cloud_input.tsv',
+  #                 feature_filename = './CLOUD/First_Try_testing')
+  
+  
+  GenerateTrainingData(14, 
+                       100, # CHANGE THIS NUMBERRRRRRRRRRRRRRRRRRRRRRRRRRR
+                       './CLOUD/sc_cloud_input.tsv',
+                       'CLOUD/dup_cloud_input.tsv', 
+                       './CLOUD/First_Try_testing')
+  
+  
+  
+  CLOUDClassify(training_prefix = './CLOUD/First_Try_training', 
+                testing_prefix = './CLOUD/First_Try_testing')
   
   
   

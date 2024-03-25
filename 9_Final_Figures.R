@@ -626,8 +626,10 @@ t <- sex_bias_dups %>%
 
 t <- t %>% mutate(func = gsub('neo_dup1','neo',func),
                   func = gsub('neo_dup2','neo',func))
-table(t$sex_bias, t$func)
-
+t <- as.data.frame(table(t$sex_bias, t$func))
+t <- pivot_wider(t, names_from = 'Var2',values_from='Freq')
+t$Var1 <- c('both female','both male','both neutral','neo gained female bias','neo gained male bias','neo switched to F from M', 'neo switched from M to F', 'one female biased copy (the non-neo copy for neo)', 'one male biased copy (the non-neo one for neo)','switched bias')
+colnames(t) <- c('bias','conserved','neo','specialized','sub')
 
 
 func <- read.csv("./Dup_Functionalizations.tsv", sep="")
