@@ -1,20 +1,21 @@
 
+# on cluster:
 
-
-source('./startup.R')
+#source('./startup.R')
 
 source("./CLOUD/CLOUD.r")
 
 
 
-
+library(dplyr)
 library(tensorflow)
+# install_tensorflow()
 library(keras) 
 library(mvtnorm)
 
 
-orthogroups <- read.delim2("./OrthoFinder_Output/Results_Jan01/Orthogroups/Orthogroups.tsv", na.strings = '')
-orig_exp <- read.csv("./Expression_Data.tsv", sep="")
+orthogroups <- read.delim2("./CLOUD/Orthogroups.tsv", na.strings = '')
+orig_exp <- read.csv("./CLOUD/Expression_Data.tsv", sep="")
 
 
 # keep only orthogroups that have trees so that I can get branch lengths for cloud input 
@@ -22,7 +23,7 @@ og_with_tree <- orthogroups %>%
   mutate(n_na = rowSums(is.na(across(everything())))) %>%
   filter(n_na <= 5)
 
-dups_anc <- read.csv("./Dup_Pairs_Ancestral.tsv", sep="")
+dups_anc <- read.csv("./CLOUD/Dup_Pairs_Ancestral.tsv", sep="")
 dups_anc <- dups_anc %>%
   filter(Orthogroup %in% og_with_tree$Orthogroup)
 
@@ -39,11 +40,9 @@ dups_anc <- dups_anc %>%
                    dup_species == 'AN' & anc_species == 'YA' ~ T,
                    dup_species == 'VI' & anc_species == 'MO' ~ T,
                    dup_species == 'ME' & anc_species == 'YA' ~ T)) %>%
-  mutate(species_pair = if_else(dup_species > anc_species,
-                                paste0(dup_species,'_',anc_species),
-                                paste0(anc_species,'_',dup_species)))
+  mutate(species_pair = paste0(dup_species,'_',anc_species))
 
-
+table(dups_anc$dup_species, dups_anc$anc_species)
 
 # extract the branch lengths (tpc and tpca for cloud input)
 dups_anc$TPC <- NA
@@ -59,7 +58,7 @@ for(i in 1:nrow(dups_anc)) {
   anc <- row$ancestral_copy
   
   
-  tree <- read.tree(paste0('./OrthoFinder_Output/Results_Jan01/Gene_Trees/',OG,'_tree.txt'))
+  tree <- read.tree(paste0('./CLOUD/Gene_Trees/', OG, '_tree.txt'))
   
   dup1_length <- setNames(tree$edge.length[sapply(1:length(tree$tip.label),function(x,y) which(y==x),y=tree$edge[,2])],tree$tip.label)[dup1]
   dup2_length <- setNames(tree$edge.length[sapply(1:length(tree$tip.label),function(x,y) which(y==x),y=tree$edge[,2])],tree$tip.label)[dup2]
@@ -79,7 +78,7 @@ for(i in 1:nrow(dups_anc)) {
 
 
 # extract single copy ortholog pairs that correspond with the dup+anc species pair 
-ortho_pairs <- read.csv("./All_Ortholog_Pairs.tsv", sep="")
+ortho_pairs <- read.csv("./CLOUD/All_Ortholog_Pairs.tsv", sep="")
 ortho_pairs <- ortho_pairs %>%
   mutate_at(vars(starts_with("species")), ~ gsub('dana', 'AN', .) %>%
                                             gsub('dmel', 'ME', .) %>%
@@ -89,10 +88,14 @@ ortho_pairs <- ortho_pairs %>%
                                             gsub('dvir', 'VI', .) %>%
                                             gsub('dwil', 'WI', .) %>%
                                             gsub('dyak', 'YA', .)) %>%
-  mutate(species_pair = if_else(species.x > species.y,
-                                paste0(species.x, '_', species.y),
-                                paste0(species.y, '_', species.x)))
+  mutate(species_pair = paste0(species.x, '_', species.y))
 
+ortho_pairs_rev <- ortho_pairs %>%
+  select(Orthogroup, species.x, YOgn.x, species.y, YOgn.y) %>%
+  mutate(species_pair = paste0(species.y, '_', species.x))
+colnames(ortho_pairs_rev) <- c('Orthogroup','species.y','YOgn.y','species.x','YOgn.x','species_pair')
+
+ortho_pairs <- rbind(ortho_pairs, ortho_pairs_rev)
 
 
 # run cloud on each species pair 
@@ -165,15 +168,15 @@ for (pair in unique(dups_anc$species_pair)) { # iterate over each dup+anc specie
     
     # run cloud
     GenerateTrainingData(m = 14, 
-                         Nk = 50,  # change to 50000
+                         Nk = 50000,
                          singlecopy_filename = './CLOUD/sc_cloud_input.tsv', 
                          duplicate_filename = './CLOUD/dup_cloud_input.tsv', 
                          training_prefix = './CLOUD/First_Try')
     
     
     ClassifierCV(m = 14, 
-                 batchsize = 50, # change to 50000
-                 num_epochs = 50, # change to 500
+                 batchsize = 50000, 
+                 num_epochs = 500, 
                  log_lambda_min = -5, 
                  log_lambda_max = -1, 
                  num_lambda = 5, 
@@ -210,7 +213,7 @@ for (pair in unique(dups_anc$species_pair)) { # iterate over each dup+anc specie
   }
 }
 
-
+write.table(func_output, file = './CLOUD/CLOUD_Output.tsv')
 
 
 
