@@ -1,5 +1,7 @@
-
-# this script also gets all ortholog pairs of each duplicate pair (and the closest ortholog pairs)
+# Author: Nathan Duda
+# Purpose: 
+#   This script determines the ancestral copy for each duplicate gene pair.
+#   Also, all ortholog pair combinations per one-to-one orthogroup are gathered.
 
 
 source('./startup.R')
@@ -11,7 +13,7 @@ dups <- read.csv("./Duplicate_Pairs.tsv", sep="")
 orthologs <- read.csv2("./Dup_Pair_Orthologs.tsv", sep="")
 
 # read in expression data 
-expression <- read.csv("./Expression_Data.tsv", sep="")
+expression <- read.csv("./Expressed_Expression_Data.tsv", sep="")
 
 # clean the column names of the orthologs dataframe and replace empty cells with NAs
 orthologs <- orthologs %>% 
@@ -58,11 +60,13 @@ for (row_num in 1:nrow(orthologs)) {
 }
 
 # merge the ancestral copy with the duplicate pairs
-ancestral_copy <- orthologs[c('Orthogroup','ancestral_copy')]
-dups <- merge(dups,ancestral_copy,by='Orthogroup')
+ancestral_copy <- orthologs %>%
+  select(Orthogroup, ancestral_copy)
+dups <- merge(dups, ancestral_copy, by='Orthogroup')
 
-# remove duplicates without ancestral copies (the orthologs they had weren't expressed)
-dups <- na.omit(dups)
+# remove duplicates without ancestral copies (no expressed orthologs)
+dups <- dups %>%
+  filter(!is.na(ancestral_copy))
 
 # write the duplicate pairs with their ancestral copy to file
 write.table(dups,'Dup_Pairs_Ancestral.tsv')
@@ -70,14 +74,15 @@ write.table(dups,'Dup_Pairs_Ancestral.tsv')
 
 
 ### all combinations of ortholog pairs
+one_to_ones <- read.csv2("./One_to_Ones.tsv", sep="")
 
-all_ortholog_pairs <- orthologs[c(1:9)] %>%
+all_ortholog_pairs <- one_to_ones %>%
+  rename_all(~gsub("_prot", "", .))  %>%
   mutate_all(~ifelse(grepl(",", .), NA, .)) %>%
   pivot_longer(cols = c(2:9))
 
 all_ortholog_pairs <- 
   merge(all_ortholog_pairs,all_ortholog_pairs,by='Orthogroup') %>%
-  na.omit() %>%
   filter(name.x!=name.y) %>% 
 
   # keep only one of the reciprocal combination pairs  
@@ -94,33 +99,5 @@ expressed_ortholog_pairs <- all_ortholog_pairs %>%
 
 # write ortholog pairs to file
 write.table(expressed_ortholog_pairs,file = './All_Ortholog_Pairs.tsv')
-
-
-
-# keep only ortholog pairs that are between two neighboring species 
-species_list <- c('dana','dmel','dmoj','dper','dpse','dvir','dwil','dyak')
-
-for (species in species_list){
-  # get the species closest to the given species 
-  species_node <- which(newick_tree$tip.label == species)
-  distances <- cophenetic(newick_tree)[species_node, ]
-  distances <- distances[distances > 0] # remove itself from distance calculation 
-  closest_species <- names(which.min(distances))
-  
-  # make sure the other ortholog is from that closest species   
-  expressed_ortholog_pairs <- expressed_ortholog_pairs %>%
-    filter(case_when(species.x == species & species.y == closest_species ~ T,
-                     species.y == species & species.x == closest_species ~ T,
-                     species.y != species & species.x != species ~ T))
-}
-
-# write ortholog pairs to file
-write.table(expressed_ortholog_pairs,file = './Ortholog_Pairs.tsv')
-
-
-
-
-
-
 
 

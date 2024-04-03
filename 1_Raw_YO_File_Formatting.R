@@ -1,55 +1,52 @@
-
+# Author: Nathan Duda
+# Purpose: 
+#   This script organizes the raw annotations from Yang & Oliver (YO).
+#   Nucleotide and protein sequences are extracted for these annotations from
+#   the FlyBase_2017_03_Genome.
 
 
 source('./startup.R')
 
 # import all annotations from YO 
-all_annotations <- read.delim("C:/Users/17735/Downloads/Eight_Species/Raw_Data/YO_Annotations/all.YO.gtf", header=FALSE)
+all_annotations <- read.delim("./Raw_Data/YO_Annotations/all.YO.gtf", header=FALSE)
 colnames(all_annotations) <- c('chrom','StringTie_or_FlyBase','type','start','end','x','strand','y','id')
 
 # format the transcripts
-transcripts <- all_annotations[all_annotations$type=='transcript',]
-transcripts <- transcripts %>% separate(id, into = c('YOtr','YOgn','old','tss'), sep = ";")
+transcripts <- all_annotations %>%
+  filter(type == 'transcript') %>%
+  separate(id, into = c('YOtr','YOgn','old','tss'), sep = "; ")
 
 # remove the YOtrs that are inside other YOtrs because won't be the longest
-transcripts <- transcripts[!grepl('contained_in YOtr',transcripts$tss),]
+transcripts <- transcripts %>%
+  filter(!grepl('contained_in YOtr', tss))
 
 # keep only the longest YOtr per YOgn
-transcripts$length <- transcripts$end - transcripts$start
-
-transcripts <- transcripts %>% 
+longest_transcript <- transcripts %>%
+  mutate(length = end - start) %>% 
   group_by(YOgn) %>%
-  filter(length == max(length))
-longest_transcript <- transcripts[!duplicated(transcripts[c('YOgn')]),]
-
+  filter(length == max(length)) %>%
+  distinct(YOgn, .keep_all = TRUE)
 
 # notes:
 ## MSTRG is the default gene name from StringTie
 ## if StringTie, its a new annotation from YO
 ## tss_id is present when the transcript starts at the same location as the first exon
 
-
 # format the longest_transcript dataframe 
-longest_transcript$YOtr <- gsub('transcript_id ','',longest_transcript$YOtr)
-longest_transcript$YOgn <- gsub(' gene_id ','',longest_transcript$YOgn)
-longest_transcript$old <- gsub(' oId ','',longest_transcript$old)
-
-longest_transcript[grepl('MSTRG', longest_transcript$old), 'old'] <- NA
-
-longest_transcript <- longest_transcript[c('YOgn','YOtr','old','chrom','strand','start','end')]
+longest_transcript <- longest_transcript %>%
+  mutate(YOtr = gsub('transcript_id ', '', YOtr),
+         YOgn = gsub(' gene_id ', '', YOgn),
+         old = gsub(' oId ','', old),
+         old = ifelse(grepl('MSTRG', old), NA, old)) %>%
+  select(YOgn, YOtr, old, chrom, strand, start, end)
 
 
 # get the sequences for the transcripts
-
 fasta_sequences <- readDNAStringSet('./Raw_Data/FlyBase_2017_03_Genomes/all_chromosome.fasta')
 
 species <- sub(".*species=([^;]+).*", "\\1", names(fasta_sequences))
 scaffolds <- gsub(" .*", "", names(fasta_sequences))
-
 names(fasta_sequences) <- paste0(species,'_',scaffolds)
-
-
-longest_transcript$chrom <- longest_transcript$chrom
 
 longest_transcript <- longest_transcript %>%
   mutate(chrom = case_when(grepl('AN',YOgn) ~ paste0('Dana_',chrom),
@@ -61,14 +58,14 @@ longest_transcript <- longest_transcript %>%
                            grepl('WI',YOgn) ~ paste0('Dwil_',chrom),
                            grepl('YA',YOgn) ~ paste0('Dyak_',chrom)))
 
-
 # function to extract sequences
 extract_sequence <- function(chrom, start, end, strand, fasta_sequences) {
   matches <- fasta_sequences[names(fasta_sequences) == chrom]
   if (length(matches) > 0) {
     seq <- subseq(matches, start, end)
-    if (strand == "-") {seq <- reverseComplement(seq)}
-    as.character(seq)
+    if (strand == "-") {
+      seq <- reverseComplement(seq)}
+      as.character(seq)
   } 
   else {NA}
 }
@@ -86,7 +83,6 @@ longest_transcript$extracted_sequence <- mapply(
 
 
 # get the longest ORFs 
-
 longest_transcript$longest_ORF <- NA
 library(ORFik)
 for (row_num in 1:nrow(longest_transcript)) {
@@ -101,7 +97,8 @@ for (row_num in 1:nrow(longest_transcript)) {
   
     # place the ORF sequence into the longest_transcript dataframe 
     longest_transcript[row_num, 'longest_ORF'] <- substr(longest_transcript[row_num,'extracted_sequence'], 
-                                                         longest_orf$start, longest_orf$end)
+                                                         longest_orf$start, 
+                                                         longest_orf$end)
   }
   
   print(row_num)
@@ -110,7 +107,8 @@ for (row_num in 1:nrow(longest_transcript)) {
 
 # remove the ORFs with 'N' in the sequences and those without ORFs 
 longest_transcript <- longest_transcript %>%
-  filter(!grepl('N',longest_ORF)) %>% filter(!is.na(longest_ORF)) %>%
+  filter(!grepl('N',longest_ORF),
+         !is.na(longest_ORF)) %>%
   rowwise() %>%
   mutate(prot = as.character(Biostrings::translate(DNAString(longest_ORF))))
 
@@ -134,12 +132,12 @@ longest_transcript <- longest_transcript %>%
 write.table(longest_transcript,file='longest_transcript.tsv')
 
 
-
 # write fasta files 
 unique_species <- unique(longest_transcript$species)
 
 for (species_name in unique_species) {
-  species_data <- longest_transcript[longest_transcript$species == species_name, ]
+  species_data <- longest_transcript %>%
+    filter(species == species_name)
   
   # for proteins:
   sequences <- paste0(">", species_data$YOgn, "\n", species_data$prot)
