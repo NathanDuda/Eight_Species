@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Author: Nathan Duda
+# Purpose: 
+#   This script runs HyPhy and MEGA. 
+#   This includes aligning proteins, getting codon alignments, and formatting trees.
+
 
 ### HyPhy: 
 
@@ -117,11 +122,5 @@ for orthogroup_file in ./One_to_One_Orthogroups/Codon_Alignments/*; do
  /home/tun37257/workdir/Eight_Species/HyPhy_Download/hyphy/HYPHYMPI busted --alignment "./One_to_One_Orthogroups/Codon_Alignments/${filename}.fa" --tree "./Gene_Trees/${filename}_tree.txt" --output "./BUSTED_One_to_One_Output/${filename}.txt" &
 done
 wait
-
-
-
-
-
-
 
 

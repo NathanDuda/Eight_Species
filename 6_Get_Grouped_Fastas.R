@@ -1,4 +1,6 @@
-
+# Author: Nathan Duda
+# Purpose: 
+#   This script writes each group necessary of genes for hyphy into fasta files. 
 
 
 source('./startup.R')
@@ -8,7 +10,7 @@ dups <- read.csv("./Dup_Pairs_Ancestral.tsv", sep="")
 
 # read in nucleotide and protein sequences for all genes
 gn_seqs <- read.csv("./longest_transcript.tsv", sep="")
-gn_seqs <- gn_seqs[c('YOgn','longest_ORF','prot')]
+gn_seqs <- gn_seqs %>% select(YOgn, longest_ORF, prot)
 
 # read in all one to two orthogroups with their genes per species 
 orthogroups <- read.csv("./Dup_Pair_Orthologs.tsv", sep="")
