@@ -90,7 +90,7 @@ for (pair in unique(dups$species_pair)) {
 
 write.table(all_cdrom_output, file = './CDROM/All_CDROM_Output.tsv')
 
-all_cdrom_output <- read.csv("C:/Users/17735/Downloads/Eight_Species/CDROM/All_CDROM_Output.tsv", sep="")
+all_cdrom_output <- read.csv("./CDROM/All_CDROM_Output.tsv", sep="")
 func <- all_cdrom_output %>%
   mutate(func = Classification,
          func = case_when(func == 'Conservation' ~ 'cons',
@@ -100,6 +100,7 @@ func <- all_cdrom_output %>%
                           func == 'Subfunctionalization' ~ 'sub')) %>%
   select(-Classification)
 
+write.table(func, './CDROM/original_CDROM_func.tsv')
 
 
 ## get relative expression levels 
@@ -185,7 +186,8 @@ func <- func %>%
 
 
 
-
+func <- func %>%
+  mutate(func_pseduo = coalesce(func, pseudo))
 
 
 
