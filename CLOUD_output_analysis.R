@@ -9,7 +9,7 @@ CDROM_func <- read.csv("./CDROM/original_CDROM_func.tsv", sep="") %>%
 
 
 ########
-species_pairs <- c('AN_YA', "ME_YA", "VI_MO", "YA_ME", "MO_VI")
+species_pairs <- c('AN_YA', "ME_YA", 'MO_VI', 'PE_PS', 'PS_PE', "VI_MO", 'WI_PS', "YA_ME")
 
 
 
@@ -128,7 +128,8 @@ for (pair in species_pairs) {
 
 ########
 
-CLOUD_func <- results
+CLOUD_func <- results %>%
+  distinct(dup_1, dup_2, ancestral_copy, .keep_all = T)
 
 t <- merge(CLOUD_func, CDROM_func, by = c('dup_1', 'dup_2'))
 
@@ -144,39 +145,47 @@ t <- t %>%
   mutate_all(~str_replace_all(., "parent", "_dup1")) %>%
   mutate_all(~str_replace_all(., "child", "_dup2"))
 
+table(t$max_identical)
 
 all_CLOUD_same <- t %>%
   filter(max_identical == 3)
 
 table(all_CLOUD_same$class_1, all_CLOUD_same$CDROM_func)
 
+sum(all_CLOUD_same$class_1 == all_CLOUD_same$CDROM_func)
+
+all_CLOUD_same <- all_CLOUD_same %>%
+  mutate(CLOUD_func = class_1) %>%
+  select(dup_1, dup_2, anc, CDROM_func, CLOUD_func)
+
+write.table(all_CLOUD_same, file = 'CDROM_CLOUD_funcs.tsv')
 
 
+# add pseudogenization
 pseudo <- read.csv("./Dup_Functionalizations.tsv", sep="") %>% 
   select(dup_1 = Dup1, dup_2 = Dup2, anc = Ancestor, pseudo = pseudo)
 
+t <- left_join(pseudo, all_CLOUD_same, by = c('dup_1', 'dup_2', 'anc'))
 
-pseudo <- pseudo %>% 
-  pivot_longer(cols = c(1:3)) %>%
-  filter((name == 'dup_1' & pseudo == 'pseudo_dup_1') | 
-           (name == 'dup_2' & pseudo == 'pseudo_dup_2') | 
-           (pseudo == 'pseudo_both' & name != 'anc'))
+t <- t %>%
+  mutate(CDROM_pseudo = coalesce(CDROM_func, pseudo),
+         CLOUD_pseudo = coalesce(CLOUD_func, pseudo)) %>%
+  filter(!is.na(CDROM_pseudo))
 
-n <- nonsense %>%
-  filter(type == 'Nonsense1' | type == 'Nonsense2') %>%
-  filter(count > 0) %>%
-  select(-has_nonsense, -count) %>%
-  pivot_longer(cols = c(2, 3)) %>%
-  filter((name == 'seq1' & type == 'Nonsense1') |
-           (name == 'seq2' & type == 'Nonsense2'))
-  
+write.table(t, file = 'CDROM_CLOUD_pseudo_funcs.tsv')
 
 
-t <- full_join(pseudo, n, by = 'value')
+#n <- nonsense %>%
+#  filter(type == 'Nonsense1' | type == 'Nonsense2') %>%
+#  filter(count > 0) %>%
+#  select(-has_nonsense, -count) %>%
+#  pivot_longer(cols = c(2, 3)) %>%
+#  filter((name == 'seq1' & type == 'Nonsense1') |
+#           (name == 'seq2' & type == 'Nonsense2'))
 
-t <- as.data.frame(t)
-
-t[is.na(t)] <- 'not'
+#t <- full_join(pseudo, n, by = 'value')
+#t <- as.data.frame(t)
+#t[is.na(t)] <- 'not'
 
 
 
