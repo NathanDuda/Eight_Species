@@ -187,37 +187,9 @@ func <- func %>%
 
 
 func <- func %>%
-  mutate(func_pseduo = coalesce(func, pseudo))
-
-
-
-
-
-
-new_counts <- as.data.frame((table(how_often_neo_is_newtissue$new_tissue))) %>% 
-  pivot_wider(names_from='Var1',values_from='Freq')
-
-func_counts <- as.data.frame(table(how_often_neo_is_newtissue$func)) %>% 
-  pivot_wider(names_from='Var1',values_from='Freq')
-
-new_counts$newtissue_specializ / func_counts$specializ # % specialized dups with new tissue expressed in both dups
-new_counts$specializ_newtissue_onedup / func_counts$specializ # % specialized dups with new tissue expressed in one dup
-
-new_counts$newtissue_neo / (func_counts$neo_dup1 + func_counts$neo_dup2) # % neo dups with new tissue expressed
-
-
-
+  mutate(func_pseudo = coalesce(func, pseudo))
 
 ###
 
 # write functionalization results to file
 write.table(func, file= 'Dup_Functionalizations.tsv')
-
-
-
-
-ggplot(func) +
-  #geom_point(aes(x=dup1_a, y=dup2_a, color = func)) +
-  geom_point(aes(x=dup1_a, y=dup2_a, color = func_strength)) +
-  theme_bw()
-

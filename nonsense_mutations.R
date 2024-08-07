@@ -174,9 +174,8 @@ write.table(results, file = './duppairs_nonsense_dnds_mutations.tsv')
 
 
 
-
+# plot to find if sequences with nonsense mutations have more nonsynonymous mutations
 nonsense <- read.csv2("./duppairs_nonsense_dnds_mutations.tsv", sep="")
-
 
 nonsense <- nonsense %>%
   group_by(seq1) %>%
@@ -190,13 +189,19 @@ nonsense %>%
     geom_boxplot()
 
 
-t <- nonsense %>%
-  filter(type == 'Nonsense1' | type == 'Nonsense2') %>%
-  filter(count != 0)
 
+# see if certain functions have more nonsense mutations
 
+func <- read.csv("./CDROM_CLOUD_funcs.tsv", sep="")
 
+t <- nonsense %>% 
+  select(dup_1 = seq1, dup_2 = seq2, type, count) %>%
+  merge(., func, by = c('dup_1', 'dup_2'))
 
+t <- t %>%
+  filter(count != 0) 
+
+table(t$CLOUD_func, t$type)
 
 
 

@@ -20,7 +20,7 @@ transcripts <- all_annotations %>%
 transcripts <- transcripts %>%
   filter(!grepl('contained_in YOtr', tss))
 
-# keep only the longest YOtr per YOgn
+# keep only the longest YOtr per YOgn (can be from StringTie or FlyBase)
 longest_transcript <- transcripts %>%
   mutate(length = end - start) %>% 
   group_by(YOgn) %>%

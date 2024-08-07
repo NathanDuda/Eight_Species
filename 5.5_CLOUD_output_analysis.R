@@ -3,7 +3,7 @@
 source('./startup.R')
 
 
-CDROM_func <- read.csv("./CDROM/original_CDROM_func.tsv", sep="") %>%
+CDROM_func <- read.csv("./Dup_Functionalizations.tsv", sep="") %>%
   select(dup_1 = Dup1, dup_2 = Dup2, anc = Ancestor, CDROM_func = func) %>%
   na.omit()
 
@@ -131,29 +131,33 @@ for (pair in species_pairs) {
 CLOUD_func <- results %>%
   distinct(dup_1, dup_2, ancestral_copy, .keep_all = T)
 
-t <- merge(CLOUD_func, CDROM_func, by = c('dup_1', 'dup_2'))
+CLOUD_CDROM_func <- merge(CLOUD_func, CDROM_func, by = c('dup_1', 'dup_2'))
 
 
-
+# keep only the duplicate pairs with CLOUD funcs the same for all 3 runs 
 max_identical <- function(...) {max(table(unlist(list(...))))}
-t <- t %>% 
+CLOUD_CDROM_func <- CLOUD_CDROM_func %>% 
   rowwise() %>% 
   select(-class_4) %>%
-  mutate(max_identical = max_identical(c_across(class_1:class_3)))
-
-t <- t %>%
+  mutate(max_identical = max_identical(c_across(class_1:class_3))) %>%
   mutate_all(~str_replace_all(., "parent", "_dup1")) %>%
   mutate_all(~str_replace_all(., "child", "_dup2"))
 
-table(t$max_identical)
+table(CLOUD_CDROM_func$max_identical)
 
-all_CLOUD_same <- t %>%
+all_CLOUD_same <- CLOUD_CDROM_func %>%
   filter(max_identical == 3)
 
+# compare CLOUD and CDROM funcs
 table(all_CLOUD_same$class_1, all_CLOUD_same$CDROM_func)
 
+# number of duplicate pairs classified into the same funcs by CDROM and CLOUD 
 sum(all_CLOUD_same$class_1 == all_CLOUD_same$CDROM_func)
 
+# percentage:
+(sum(all_CLOUD_same$class_1 == all_CLOUD_same$CDROM_func) / nrow(all_CLOUD_same)) * 100
+
+# format and write to file CLOUD+CDROM funcs dataframe
 all_CLOUD_same <- all_CLOUD_same %>%
   mutate(CLOUD_func = class_1) %>%
   select(dup_1, dup_2, anc, CDROM_func, CLOUD_func)
@@ -161,33 +165,17 @@ all_CLOUD_same <- all_CLOUD_same %>%
 write.table(all_CLOUD_same, file = 'CDROM_CLOUD_funcs.tsv')
 
 
-# add pseudogenization
+# add pseudogenization (classified in script 2_OrthoFinder_Output_Cleanup)
 pseudo <- read.csv("./Dup_Functionalizations.tsv", sep="") %>% 
   select(dup_1 = Dup1, dup_2 = Dup2, anc = Ancestor, pseudo = pseudo)
 
-t <- left_join(pseudo, all_CLOUD_same, by = c('dup_1', 'dup_2', 'anc'))
+CLOUD_CDROM_pseudo <- left_join(pseudo, all_CLOUD_same, by = c('dup_1', 'dup_2', 'anc'))
 
-t <- t %>%
+CLOUD_CDROM_pseudo <- CLOUD_CDROM_pseudo %>%
   mutate(CDROM_pseudo = coalesce(CDROM_func, pseudo),
          CLOUD_pseudo = coalesce(CLOUD_func, pseudo)) %>%
   filter(!is.na(CDROM_pseudo))
 
-write.table(t, file = 'CDROM_CLOUD_pseudo_funcs.tsv')
-
-
-#n <- nonsense %>%
-#  filter(type == 'Nonsense1' | type == 'Nonsense2') %>%
-#  filter(count > 0) %>%
-#  select(-has_nonsense, -count) %>%
-#  pivot_longer(cols = c(2, 3)) %>%
-#  filter((name == 'seq1' & type == 'Nonsense1') |
-#           (name == 'seq2' & type == 'Nonsense2'))
-
-#t <- full_join(pseudo, n, by = 'value')
-#t <- as.data.frame(t)
-#t[is.na(t)] <- 'not'
-
-
-
+write.table(CLOUD_CDROM_pseudo, file = 'CDROM_CLOUD_pseudo_funcs.tsv')
 
 
